@@ -14,4 +14,3 @@ class Les(BaseModel):
 
 class Planning(BaseModel):
     lessen: list[Les]
-    seizoenen: list[Seizoen]

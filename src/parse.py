@@ -74,6 +74,4 @@ def parse_planning(planning_config: PlanningConfig) -> Planning:
     # Sorteer lessen op datum en tijd
     lessen.sort(key=lambda x: (x.datum, x.tijd))
 
-    return Planning(
-        lessen=lessen,
-        seizoenen=planning_config.seizoenen)
+    return Planning(lessen=lessen)
