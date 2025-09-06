@@ -1,8 +1,8 @@
 - [X] Lees planning config
 - [X] parse config naar concretemodels
 - [ ] export models naar excel
-    - [ ] 1 rij per les
-    - [ ] gemergde cellen
+    - [X] 1 rij per les
+    - [X] gemergde cellen
     - [ ] grouped rows
 - [ ] import excel naar models
 - [ ] import lesgevers lijst
