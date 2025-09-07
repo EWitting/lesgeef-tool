@@ -1,4 +1,4 @@
-# Planning generator
+# Jaarplanning maken
 
 * Maak een **planning.yml** bestand aan zoals hier onder. 
 * **Seizoenen** zijn de periodes waarin de lessen plaatsvinden. Vooral handig om rooster datumprikker periodes uit elkaar te houden en winterstop e.d. te bepalen.
@@ -41,3 +41,16 @@ activiteiten:
     les-gaat-door: false
    ...
 ```
+
+# Seizoen inroosteren
+
+* **Maak een `Lesgevers` sheet** in een excel bestand met de namen van iedereen in de commissie (kan in hetzelfde bestand als de planning zijn). Dit is om ervaring bij te kunnen houden maar ook vooral om te kunnen zien wie nog ontbreekt in de datumprikker. Het moet tenminste kolommen `Naam`, `Ervaring`  en `Actief` hebben. Waarbij `Ervaring` bijvoorbeeld het aantal jaren exclusief de huidige is.
+
+| Naam | Ervaring (jaren) | Actief |
+|------|----------------|--------|
+| Jan Jansen | 3 | true |
+| Piet Peters | 2 | false |
+
+* **Maak een datumprikker** aan, zorg (vanzelfsprekend) dat de data en tijden zo veel mogelijk overeen komen met de lessen in de planning voor een specifiek seizoen. Het wordt gemeld als er iets ontbreekt.
+* **Exporteer de datumprikker naar excel**, update hem af en toe door opnieuw te downloaden zodra meer mensen het hebben ingevuld.
+* (Optioneel) pas `rooster_config.yml` voor configuratie van het rooster algoritme.

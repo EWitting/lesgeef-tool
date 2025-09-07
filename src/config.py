@@ -38,6 +38,14 @@ class Activiteit(BaseModel):
     tijd: str | None = None
 
 
+class Lesgever(BaseModel):
+    """Persoonlijke info, handmatig verzamelen, zorgvuldig mee om gaan. 
+    Naam matchen met smoelenboek url. Naam wordt later gematched met datumprikker."""
+    naam: str
+    ervaring_jaren: int
+    actief: bool # Op false zetten zodra nieuwe commissie bepaald is
+
+
 class PlanningConfig(BaseModel):
     seizoenen: List[Seizoen]
     weekrooster: List[WeekRoosterDag]
@@ -56,4 +64,20 @@ class PlanningConfig(BaseModel):
     def from_yaml_string(cls, yaml_string: str) -> "PlanningConfig":
         """Load configuration from YAML string."""
         yaml_data = yaml.safe_load(yaml_string)
+        return cls(**yaml_data)
+
+class RoosterConfig(BaseModel):
+    penalty_lesgever_tekort: float = 10
+    penalty_misschien: float = 8
+    penalty_geen_ervaren_lesgever: float = 5
+    penalty_meerdere_lessen_per_week: float = 5
+    penalty_ongelijk_verdeeld: float = 5
+    lesgever_minimum: int = 2
+    lesgever_maximum: int = 3   
+
+    @classmethod
+    def from_yaml_file(cls, yaml_path: str | Path) -> "RoosterConfig":
+        """Load configuration from YAML file."""
+        with open(yaml_path, 'r', encoding='utf-8') as file:
+            yaml_data = yaml.safe_load(file)
         return cls(**yaml_data)

@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 from typing import Generator
 from .config import PlanningConfig
-from .models import Planning, Seizoen, Les
+from .models import Planning, Les
 
 DAG_TO_NUMBER = {
     "maandag": 0,

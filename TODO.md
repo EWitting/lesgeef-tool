@@ -3,9 +3,11 @@
 - [ ] export models naar excel
     - [X] 1 rij per les
     - [X] gemergde cellen
-    - [ ] grouped rows
 - [ ] import excel naar models
-- [ ] import lesgevers lijst
+- [X] import lesgevers lijst
+- [ ] import datumprikker excel
+    - [X] match lesgevers
+    - [X] match lessen
 - [ ] Deel lesgevers in bij rooster
     - [ ] Op basis van:
         - [ ] Beschikbaarheid
@@ -14,3 +16,7 @@
         - [ ] Meerdere lessen in hetzelfde weekend
         - [ ] 2-3 mensen per les
         - [ ] vroegste paar lessen het belangrijkst?
+        - [ ] VB sleutel?
+- [ ] gedeeltelijke roosters aanpassen
+    - [ ] rekening houden met bestaande lessen in het rooster
+    - [ ] rekening houden met ervaring krijgen tijdens het seizoen
