@@ -1,6 +1,8 @@
 """Importeert excel bestanden naar models. Voor zowel planning, lesgevers als datumprikker."""
 import pandas as pd
-from .models import Lesgever, Les, DatumPrikker
+from datetime import datetime
+from .models import Lesgever, Les, DatumPrikker, Planning
+from .config import Seizoen
 from Levenshtein import distance as levenshtein_distance
 
 def import_lesgevers(lesgevers_path: str) -> list[Lesgever]:
@@ -96,3 +98,112 @@ def distance(naam_dapri, naam_volledig) -> float:
     volledige_match = levenshtein_distance(naam_dapri.lower(), naam_volledig.lower())
     alleen_voornaam = levenshtein_distance(naam_dapri.lower(), naam_volledig.split(" ")[0].lower())
     return min(volledige_match, alleen_voornaam)
+
+def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
+    """Importeert planning uit een xlsx bestand. Sheet 'Planning' wordt gebruikt.
+    Gebruikt ffill() alleen voor Seizoen en Week kolommen om merged cells te behandelen.
+    
+    Args:
+        excel_path: Pad naar het Excel bestand
+        starting_year: Startjaar voor datums zonder jaar (default: 2025)
+        
+    Returns:
+        Planning object met alle lessen uit de Excel
+    """
+    
+    # Lees Excel bestand in
+    df = pd.read_excel(excel_path, sheet_name="Planning")
+    
+    # Gebruik forward fill alleen voor Seizoen en Week kolommen om merged cells te behandelen
+    if "Seizoen" in df.columns:
+        df["Seizoen"] = df["Seizoen"].ffill()
+    if "Week" in df.columns:
+        df["Week"] = df["Week"].ffill()
+    
+    # Verwachte kolommen gebaseerd op export functie:
+    # Seizoen | Week | Datum | Tijd | Lesgever1 | Lesgever2 | Lesgever3 | Info
+    expected_columns = ["Seizoen", "Week", "Datum", "Tijd", "Info"]
+    lesgever_columns = [col for col in df.columns if col not in expected_columns and not col.startswith("Unnamed")]
+    
+    # Als er geen expliciete lesgever kolommen zijn, probeer te detecteren
+    if not lesgever_columns:
+        # Zoek naar kolommen tussen Tijd en Info die lesgevers zouden kunnen zijn
+        tijd_idx = df.columns.get_loc("Tijd") if "Tijd" in df.columns else 3
+        info_idx = df.columns.get_loc("Info") if "Info" in df.columns else len(df.columns) - 1
+        lesgever_columns = [df.columns[i] for i in range(tijd_idx + 1, info_idx)]
+    
+    lessen = []
+    
+    for _, row in df.iterrows():
+        # Parse datum
+        datum_str = row["Datum"]
+        if pd.isna(datum_str) or datum_str == "":
+            continue  # Skip empty rows
+            
+        # Probeer verschillende datum formaten
+        datum = None
+        for date_format in ["%A %d %b", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+            try:
+                parsed_date = datetime.strptime(str(datum_str), date_format)
+                # Als alleen dag/maand gegeven, gebruik starting_year en logica voor jaar overgangen
+                if date_format == "%A %d %b":
+                    datum = parsed_date.replace(year=starting_year).date()
+                    # Als we al datum hebben gehad en deze datum is eerder in het jaar,
+                    # dan zijn we waarschijnlijk in het volgende jaar
+                    if lessen and datum < lessen[-1].datum:
+                        datum = parsed_date.replace(year=starting_year + 1).date()
+                else:
+                    datum = parsed_date.date()
+                break
+            except ValueError:
+                continue
+                
+        if datum is None:
+            print(f"Kon datum niet parsen: {datum_str}")
+            continue
+            
+        # Parse tijd
+        tijd = str(row["Tijd"]) if not pd.isna(row["Tijd"]) else ""
+        
+        # Parse seizoen
+        seizoen = None
+        if not pd.isna(row["Seizoen"]) and row["Seizoen"] != "":
+            seizoen_naam = str(row["Seizoen"])
+            # Maak een simpele seizoen object - in een echte implementatie zou je 
+            # dit kunnen matchen met bestaande seizoenen
+            seizoen = Seizoen(naam=seizoen_naam, begin=datum, eind=datum)
+        
+        # Parse lesgevers
+        lesgevers = []
+        for col in lesgever_columns:
+            if col in row and not pd.isna(row[col]) and str(row[col]).strip() != "":
+                lesgever_naam = str(row[col]).strip()
+                if lesgever_naam != "Geen les":  # Skip merged "Geen les" cells
+                    # Maak een simpele lesgever object
+                    lesgever = Lesgever(naam=lesgever_naam, ervaring_jaren=0, actief=True)
+                    lesgevers.append(lesgever)
+        
+        # Parse naam/info
+        naam = None
+        if not pd.isna(row["Info"]) and str(row["Info"]).strip() != "":
+            naam = str(row["Info"]).strip()
+        
+        # Bepaal of les doorgaat (als er "Geen les" staat, gaat het niet door)
+        gaat_door = True
+        if any("Geen les" in str(row[col]) for col in lesgever_columns if col in row and not pd.isna(row[col])):
+            gaat_door = False
+            lesgevers = []  # Clear lesgevers als les niet doorgaat
+        
+        # Maak Les object
+        les = Les(
+            datum=datum,
+            tijd=tijd,
+            naam=naam,
+            lesgevers=lesgevers if lesgevers else None,
+            gaat_door=gaat_door,
+            seizoen=seizoen
+        )
+        
+        lessen.append(les)
+    
+    return Planning(lessen=lessen)

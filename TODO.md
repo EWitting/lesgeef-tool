@@ -1,11 +1,11 @@
 - [X] Lees planning config
 - [X] parse config naar concretemodels
-- [ ] export models naar excel
+- [X] export models naar excel
     - [X] 1 rij per les
     - [X] gemergde cellen
-- [ ] import excel naar models
+- [X] import excel naar models
 - [X] import lesgevers lijst
-- [ ] import datumprikker excel
+- [X] import datumprikker excel
     - [X] match lesgevers
     - [X] match lessen
 - [X] Deel lesgevers in bij rooster
