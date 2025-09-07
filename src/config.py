@@ -74,6 +74,7 @@ class RoosterConfig(BaseModel):
     penalty_ongelijk_verdeeld: float = 5
     lesgever_minimum: int = 2
     lesgever_maximum: int = 3   
+    lesgever_bonus: float = 3
 
     @classmethod
     def from_yaml_file(cls, yaml_path: str | Path) -> "RoosterConfig":

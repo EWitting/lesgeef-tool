@@ -59,8 +59,13 @@ def write_les(worksheet: xlsxwriter.worksheet, workbook: xlsxwriter.workbook, le
         format = workbook.add_format({"align": "center", "left": 1} | fmt)
         worksheet.merge_range(range_spec, "Geen les", format)
     else:
-        for col in COL_MAP["lesgevers"]:
-            worksheet.write(row, col, "", l_border_format if col == COL_MAP["lesgevers"][0] else format)
+        lesgevers_namen = []
+        if les.lesgevers:
+            for lesgever in les.lesgevers:
+                lesgevers_namen.append(lesgever.naam)
+        lesgevers_namen = lesgevers_namen + [""] * (AANTAL_LESGEVERS - len(lesgevers_namen))
+        for lesgever, col in zip(lesgevers_namen, COL_MAP["lesgevers"]):
+            worksheet.write(row, col, lesgever, l_border_format if col == COL_MAP["lesgevers"][0] else format)
 
 
 def export_planning(planning: Planning, excel_path: str):

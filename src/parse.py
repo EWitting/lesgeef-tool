@@ -1,4 +1,4 @@
-
+"""Parset planning configuratie naar een volledige jaarplanning"""
 from datetime import date, timedelta
 from typing import Generator
 from .config import PlanningConfig

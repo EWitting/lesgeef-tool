@@ -8,15 +8,14 @@
 - [ ] import datumprikker excel
     - [X] match lesgevers
     - [X] match lessen
-- [ ] Deel lesgevers in bij rooster
-    - [ ] Op basis van:
-        - [ ] Beschikbaarheid
-        - [ ] Aantal lessen
-        - [ ] Ervaring
-        - [ ] Meerdere lessen in hetzelfde weekend
-        - [ ] 2-3 mensen per les
-        - [ ] vroegste paar lessen het belangrijkst?
-        - [ ] VB sleutel?
+- [X] Deel lesgevers in bij rooster
+    - [X] Op basis van:
+        - [X] Beschikbaarheid
+        - [X] Aantal lessen
+        - [X] Ervaring
+        - [X] Meerdere lessen in hetzelfde weekend
+        - [X] 2-3 mensen per les
 - [ ] gedeeltelijke roosters aanpassen
-    - [ ] rekening houden met bestaande lessen in het rooster
+    - [ ] indelingen vastzetten die al in het rooster zitten, of lessen die al geweest zijn
+    - [ ] eventueel met penalty een indeling aanpassen voor een komende les
     - [ ] rekening houden met ervaring krijgen tijdens het seizoen
