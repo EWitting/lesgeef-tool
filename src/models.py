@@ -19,7 +19,9 @@ class Les(BaseModel):
     def id(self) -> str:
         import locale
         locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
-        return f"{self.datum.strftime('%a %d %b %Y')} {self.tijd}".replace(" ", "")
+        # Use %d and then strip leading zero to be cross-platform compatible
+        day_str = self.datum.strftime('%d').lstrip('0')
+        return f"{self.datum.strftime('%a')} {day_str} {self.datum.strftime('%b %Y')} {self.tijd}".replace(" ", "")
 
 class Planning(BaseModel):
     lessen: list[Les]

@@ -11,7 +11,7 @@ if __name__ == "__main__":
     # planning = parse_planning(planning_config)
     
     # Manier 2: Import planning direct uit Excel bestand (alternatief)
-    planning = import_planning("./data/planning.xlsx", starting_year=2025)
+    planning = import_planning("./data/planning.xlsx", starting_year=2024)
 
     lesgevers_path = "./data/lesgevers.xlsx"
     lesgevers = import_lesgevers(lesgevers_path)
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     datumprikker_path = "./data/dapri.xlsx"
     datumprikker = import_datumprikker(datumprikker_path, planning.lessen, lesgevers)
 
-    schedule_lessons(lesgevers, datumprikker, RoosterConfig())
+    schedule_lessons(datumprikker, RoosterConfig())
 
     output_path = "./data/planning.xlsx"
     export_planning(planning, output_path)

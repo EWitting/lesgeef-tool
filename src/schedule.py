@@ -2,7 +2,7 @@ import ortools.sat.python.cp_model as cp_model
 from .config import RoosterConfig
 from .models import Les, Lesgever, Planning, DatumPrikker
 
-def schedule_lessons(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: RoosterConfig) -> None:
+def schedule_lessons(datumprikker: DatumPrikker, config: RoosterConfig) -> None:
     """Optimaliseert rooster op basis van een aantal constraints, 
     vooral soft constraints, om rekening te houden met situaties waar een perfect rooster niet gemaakt kan worden.
     Gebruikt Google OR-Tools. Vult alleen de lessen in die in de datumprikker voorkomen.
@@ -24,6 +24,7 @@ def schedule_lessons(lesgevers: list[Lesgever], datumprikker: DatumPrikker, conf
 
     # Matrix met assignments als variabelen in de searchspace
     # Harde constraint dat beschikbaarheid niet Nee kan zijn 
+    lesgevers = datumprikker.lesgevers_al_ingevuld
     model, assignments = _make_model(lesgevers, datumprikker, config, hard_min=True)
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
@@ -60,7 +61,7 @@ def _make_model(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: R
     # Harde Constraint: Alleen bij Ja of Misschien kan een lesgever worden ingedeeld
     for index_lesgever in range(len(lesgevers)):
         for index_les in range(len(lessen)):            
-            if datumprikker.beschikbaarheid[index_lesgever][index_les] != "Nee": 
+            if datumprikker.beschikbaarheid[index_lesgever][index_les] in ["Ja","Misschien"]: 
                 var = model.NewBoolVar(f"assignment_{index_lesgever}_{index_les}")
                 assignments[(index_lesgever, index_les)] = var
                 assignments_per_les[index_les].append(var)

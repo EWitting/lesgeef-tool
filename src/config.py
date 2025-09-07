@@ -70,7 +70,7 @@ class RoosterConfig(BaseModel):
     penalty_lesgever_tekort: float = 10
     penalty_misschien: float = 8
     penalty_geen_ervaren_lesgever: float = 5
-    penalty_meerdere_lessen_per_week: float = 5
+    penalty_meerdere_lessen_per_week: float = 8
     penalty_ongelijk_verdeeld: float = 5
     lesgever_minimum: int = 2
     lesgever_maximum: int = 3   

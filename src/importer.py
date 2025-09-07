@@ -4,6 +4,7 @@ from datetime import datetime
 from .models import Lesgever, Les, DatumPrikker, Planning
 from .config import Seizoen
 from Levenshtein import distance as levenshtein_distance
+import locale
 
 def import_lesgevers(lesgevers_path: str) -> list[Lesgever]:
     """Importeert lesgevers uit een xlsx bestand. Sheet 'Lesgevers' wordt gebruikt."""
@@ -68,7 +69,7 @@ def match_lessen(dapri_lessen: list[str], lessen: list[Les]) -> list[Les]:
     for dapri_les in dapri_lessen:
         if dapri_les not in planning_ids:
             # Find and print the closest match for debugging
-            planning_ids_distances = [(pid, Levenshtein.distance(dapri_les, pid)) for pid in planning_ids]
+            planning_ids_distances = [(pid, levenshtein_distance(dapri_les, pid)) for pid in planning_ids]
             closest_match = min(planning_ids_distances, key=lambda x: x[1])
             print(f"Dichtstbijzijnde match voor '{dapri_les}' is '{closest_match[0]}' (afstand: {closest_match[1]})")
             raise ValueError(f"Les {dapri_les} niet gevonden in planning! Pas de spreadsheet handmatig aan om het conflict op te lossen.")
@@ -141,23 +142,26 @@ def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
             continue  # Skip empty rows
             
         # Probeer verschillende datum formaten
+        jaren_verlopen = 0
         datum = None
-        for date_format in ["%A %d %b", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]:
-            try:
-                parsed_date = datetime.strptime(str(datum_str), date_format)
-                # Als alleen dag/maand gegeven, gebruik starting_year en logica voor jaar overgangen
-                if date_format == "%A %d %b":
-                    datum = parsed_date.replace(year=starting_year).date()
-                    # Als we al datum hebben gehad en deze datum is eerder in het jaar,
-                    # dan zijn we waarschijnlijk in het volgende jaar
-                    if lessen and datum < lessen[-1].datum:
-                        datum = parsed_date.replace(year=starting_year + 1).date()
-                else:
-                    datum = parsed_date.date()
-                break
-            except ValueError:
-                continue
-                
+        for _locale in ["nl_NL", "en_US"]:
+            locale.setlocale(locale.LC_TIME, _locale)
+            for date_format in ["%A %d %b", "%a %d-%b", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                try:
+                    parsed_date = datetime.strptime(str(datum_str), date_format)
+                    # Als alleen dag/maand gegeven, gebruik starting_year en logica voor jaar overgangen
+                    if "Y" not in date_format:
+                        datum = parsed_date.replace(year=starting_year).date()
+                        # Als we al datum hebben gehad en deze datum is eerder in het jaar,
+                        # dan zijn we waarschijnlijk in het volgende jaar
+                        if lessen and datum < lessen[-1].datum:
+                            datum = parsed_date.replace(year=starting_year + jaren_verlopen).date()
+                            jaren_verlopen += 1
+                    else:
+                        datum = parsed_date.date()
+                    break
+                except ValueError:
+                    continue
         if datum is None:
             print(f"Kon datum niet parsen: {datum_str}")
             continue
