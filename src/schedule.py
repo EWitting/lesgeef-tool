@@ -77,7 +77,7 @@ def _make_model(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: R
         else:        
             aantal_tekort = model.NewIntVar(0, config.lesgever_minimum, f"aantal_tekort_{index_les}")
             aantal_lesgevers = sum(assignments_per_les[index_les])
-            model.Add(aantal_tekort >= aantal_lesgevers - config.lesgever_minimum)
+            model.Add(aantal_tekort >= config.lesgever_minimum - aantal_lesgevers)
             model.Add(aantal_tekort >= 0)        
             objective_terms.append(config.penalty_lesgever_tekort * aantal_tekort)
 
