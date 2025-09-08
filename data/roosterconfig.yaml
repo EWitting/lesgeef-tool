@@ -1,0 +1,12 @@
+# Prioriteiten voor rooster maken
+lesgever_minimum: 2                  # (Soort van) hard minimum
+lesgever_maximum: 3                  # Harde maximum
+
+penalty_lesgever_tekort: 10         # Voor elke lesgever onder minimum
+penalty_misschien: 8                # Voor elke ingeroosterde lesgever met Misschien
+penalty_geen_ervaren_lesgever: 5    # Als een les geen ervaren lesgever heeft
+penalty_meerdere_lessen_per_week: 8 # Voor elke les meer dan 1 die dezezelfde persoon per week geeft
+penalty_ongelijk_verdeeld: 5        # Voor de afstand tussen de meest ingeroosterde en minst ingeroosterde lesgever
+
+# Bonus scores
+lesgever_bonus: 3                    # Meer lesgevers is beter

@@ -19,7 +19,8 @@ if __name__ == "__main__":
     datumprikker_path = "./data/dapri.xlsx"
     datumprikker = import_datumprikker(datumprikker_path, planning.lessen, lesgevers)
 
-    schedule_lessons(datumprikker, RoosterConfig())
+    rooster_config = RoosterConfig.from_yaml_file("./data/roosterconfig.yaml")
+    schedule_lessons(datumprikker, rooster_config)
 
     output_path = "./data/planning.xlsx"
     export_planning(planning, output_path)
