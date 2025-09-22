@@ -4,6 +4,7 @@ from src.export import export_planning
 from src.importer import import_datumprikker, import_lesgevers, import_planning, import_forms_datumprikker
 from src.schedule import schedule_lessons
 from src.config import RoosterConfig
+from src.report import generate_report
 import numpy as np
 
 if __name__ == "__main__":
@@ -26,6 +27,13 @@ if __name__ == "__main__":
 
     rooster_config = RoosterConfig.from_yaml_file("./data/roosterconfig.yaml")
     schedule_lessons(datumprikker, rooster_config)
+
+    # Genereer rapport
+    rapport = generate_report(planning, datumprikker, rooster_config)
+    print("\n" + "="*50)
+    print("ROOSTER RAPPORT")
+    print("="*50)
+    print(rapport)
 
     output_path = "./data/planning.xlsx"
     export_planning(planning, output_path)
