@@ -124,14 +124,16 @@ def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
     # Verwachte kolommen gebaseerd op export functie:
     # Seizoen | Week | Datum | Tijd | Lesgever1 | Lesgever2 | Lesgever3 | Info
     expected_columns = ["Seizoen", "Week", "Datum", "Tijd", "Info"]
-    lesgever_columns = [col for col in df.columns if col not in expected_columns and not col.startswith("Unnamed")]
+    for col in expected_columns:
+        if col not in df.columns:
+            raise ValueError(f"Kolom {col} niet gevonden in Excel bestand")
     
-    # Als er geen expliciete lesgever kolommen zijn, probeer te detecteren
-    if not lesgever_columns:
-        # Zoek naar kolommen tussen Tijd en Info die lesgevers zouden kunnen zijn
-        tijd_idx = df.columns.get_loc("Tijd") if "Tijd" in df.columns else 3
-        info_idx = df.columns.get_loc("Info") if "Info" in df.columns else len(df.columns) - 1
-        lesgever_columns = [df.columns[i] for i in range(tijd_idx + 1, info_idx)]
+    # Vind lesgevers als alle kolommen tussen Tijd en Info
+    tijd_idx = df.columns.get_loc("Tijd") if "Tijd" in df.columns else 3
+    info_idx = df.columns.get_loc("Info") if "Info" in df.columns else len(df.columns) - 1
+    lesgever_columns = [df.columns[i] for i in range(tijd_idx + 1, info_idx)]
+    print(f"Tijd idx: {tijd_idx}, Info idx: {info_idx}")
+    print(f"Lesgever kolommen: {lesgever_columns}")
     
     lessen = []
     
@@ -139,33 +141,37 @@ def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
         # Parse datum
         datum_str = row["Datum"]
         if pd.isna(datum_str) or datum_str == "":
-            continue  # Skip empty rows
-            
-        # Probeer verschillende datum formaten
-        jaren_verlopen = 0
-        datum = None
-        for _locale in ["nl_NL", "en_US"]:
-            locale.setlocale(locale.LC_TIME, _locale)
-            for date_format in ["%A %d %b", "%a %d-%b", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]:
-                try:
-                    parsed_date = datetime.strptime(str(datum_str), date_format)
-                    # Als alleen dag/maand gegeven, gebruik starting_year en logica voor jaar overgangen
-                    if "Y" not in date_format:
-                        datum = parsed_date.replace(year=starting_year).date()
-                        # Als we al datum hebben gehad en deze datum is eerder in het jaar,
-                        # dan zijn we waarschijnlijk in het volgende jaar
-                        if lessen and datum < lessen[-1].datum:
-                            datum = parsed_date.replace(year=starting_year + jaren_verlopen).date()
-                            jaren_verlopen += 1
-                    else:
-                        datum = parsed_date.date()
-                    break
-                except ValueError:
-                    continue
-        if datum is None:
-            print(f"Kon datum niet parsen: {datum_str}")
-            continue
-            
+            continue  # Skip empty row
+
+        # Als het al een datum is, sla direct op
+        if isinstance(datum_str, datetime):
+            datum = datum_str.date()
+        else:                
+            # Probeer verschillende datum formats
+            jaren_verlopen = 0
+            datum = None
+            for _locale in ["nl_NL", "en_US"]:
+                locale.setlocale(locale.LC_TIME, _locale)
+                for date_format in ["%A %d %b", "%a %d-%b", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"]:
+                    try:
+                        parsed_date = datetime.strptime(str(datum_str), date_format)
+                        # Als alleen dag/maand gegeven, gebruik starting_year en logica voor jaar overgangen
+                        if "Y" not in date_format:
+                            datum = parsed_date.replace(year=starting_year).date()
+                            # Als we al datum hebben gehad en deze datum is eerder in het jaar,
+                            # dan zijn we waarschijnlijk in het volgende jaar
+                            if lessen and datum < lessen[-1].datum:
+                                datum = parsed_date.replace(year=starting_year + jaren_verlopen).date()
+                                jaren_verlopen += 1
+                        else:
+                            datum = parsed_date.date()
+                        break
+                    except ValueError:
+                        continue
+            if datum is None:
+                print(f"Kon datum niet parsen: {datum_str}")
+                continue
+                
         # Parse tijd
         tijd = str(row["Tijd"]) if not pd.isna(row["Tijd"]) else ""
         
