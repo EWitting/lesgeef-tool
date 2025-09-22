@@ -1,5 +1,5 @@
 """Completed instantiation of the models after parsing."""
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel
 from .config import Seizoen
 
@@ -16,12 +16,10 @@ class Les(BaseModel):
     gaat_door: bool = True
     seizoen: Seizoen | None = None
 
-    def id(self) -> str:
-        import locale
-        locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
-        # Use %d and then strip leading zero to be cross-platform compatible
-        day_str = self.datum.strftime('%d').lstrip('0')
-        return f"{self.datum.strftime('%a')} {day_str} {self.datum.strftime('%b %Y')} {self.tijd}".replace(" ", "")
+    def datetime(self) -> datetime:
+        # Gebruikt alleen de begintijd (ervan uitgaand dat tijd in het format HH:MM - HH:MM is)
+        begin_tijd = self.tijd.split("-")[0].rstrip()
+        return datetime.combine(self.datum, datetime.strptime(begin_tijd, "%H:%M").time())
 
 class Planning(BaseModel):
     lessen: list[Les]

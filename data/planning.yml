@@ -5,12 +5,6 @@ seizoenen:
   - naam: "Naseizoen 2"
     begin: "2025-10-01"
     eind: "2025-11-16"
-  - naam: "Voorseizoen 1"
-    begin: "2026-04-25"
-    eind: "2026-05-31"
-  - naam: "Voorseizoen 2"
-    begin: "2026-06-01"
-    eind: "2026-06-30"
 
 weekrooster:
   - dag: "woensdag"

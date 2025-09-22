@@ -43,7 +43,7 @@ def schedule_lessons(datumprikker: DatumPrikker, config: RoosterConfig) -> None:
         for index_lesgever, lesgever in enumerate(lesgevers):
             if (index_lesgever, index_les) in assignments and solver.Value(assignments[(index_lesgever, index_les)]):
                 les.lesgevers.append(lesgever)
-                print(f"Les {les.id()} ingevuld met lesgever {lesgever.naam}")
+                print(f"Les {les.datetime()} ingevuld met lesgever {lesgever.naam}")
     print("Rooster succesvol ingevuld!")
     return # Geen return waardes
 

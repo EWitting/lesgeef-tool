@@ -1,9 +1,10 @@
 from src.parse import parse_planning
 from src.config import PlanningConfig
 from src.export import export_planning
-from src.importer import import_datumprikker, import_lesgevers, import_planning
+from src.importer import import_datumprikker, import_lesgevers, import_planning, import_forms_datumprikker
 from src.schedule import schedule_lessons
 from src.config import RoosterConfig
+import numpy as np
 
 if __name__ == "__main__":
     # Manier 1: Parse planning uit YAML configuratie
@@ -16,11 +17,15 @@ if __name__ == "__main__":
     lesgevers_path = "./data/lesgevers.xlsx"
     lesgevers = import_lesgevers(lesgevers_path)
 
-    # datumprikker_path = "./data/dapri.xlsx"
-    # datumprikker = import_datumprikker(datumprikker_path, planning.lessen, lesgevers)
+    form_datumprikker_path = "./data/Beschikbaarheid Naseizoen 2 2025 (Responses).xlsx"
+    datumprikker = import_forms_datumprikker(form_datumprikker_path, planning.lessen, lesgevers)
 
-    # rooster_config = RoosterConfig.from_yaml_file("./data/roosterconfig.yaml")
-    # schedule_lessons(datumprikker, rooster_config)
+    print(f"Lesgevers die minimaal 1 keer kunnen: {(np.array(datumprikker.beschikbaarheid) != 'Nee').any(axis=1).sum()}")
+    print(f"Lesgevers al ingevuld: {len(datumprikker.lesgevers_al_ingevuld)}")
+    print(f"Lesgevers nog te vullen: {len(datumprikker.lesgevers_nog_te_vullen)}")
+
+    rooster_config = RoosterConfig.from_yaml_file("./data/roosterconfig.yaml")
+    schedule_lessons(datumprikker, rooster_config)
 
     output_path = "./data/planning.xlsx"
     export_planning(planning, output_path)

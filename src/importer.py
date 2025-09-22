@@ -36,9 +36,9 @@ def import_datumprikker(datumprikker_path: str, lessen: list[Les], lesgevers: li
     # Lees excel bestand in
     df = pd.read_excel(datumprikker_path)
     
-    # Lees lessen in het datumprikker bestand, en converteer naar Les.id() format string
+    # Lees lessen in het datumprikker bestand, en converteer naar datetime van starttijd
     dapri_lessen = df.iloc[3,2:].to_list() # In format 'wo 10 sep 2025\n01:00 - 05:00\nPKursus\n[100%]'
-    dapri_lessen = [" ".join(l.split("\n")[:2]).replace(" ", "") for l in dapri_lessen] # in format 'wo10sep202501:00-05:00'
+    dapri_lessen = [datetime.strptime(l, "%a %d %b %Y\n%H:%M") for l in dapri_lessen]
     dapri_lessen_gematcht = match_lessen(dapri_lessen, lessen)
 
     # Lees lesgevers in het datumprikker bestand
@@ -60,18 +60,61 @@ def import_datumprikker(datumprikker_path: str, lessen: list[Les], lesgevers: li
         lesgevers_nog_te_vullen=ontbrekende_lesgevers,
         beschikbaarheid=beschikbaarheid)
 
+def import_forms_datumprikker(forms_datumprikker_path: str, lessen: list[Les], lesgevers: list[Lesgever]) -> DatumPrikker:
+    """Matcht de google forms excel met de lessen en lesgevers. De output is een DatumPrikker model.
+    Het is mogelijk om een datumprikker te gebruiken voor een gedeelte van de lessen die worden meegegeven."""
 
-def match_lessen(dapri_lessen: list[str], lessen: list[Les]) -> list[Les]:
+    # Lees excel bestand in
+    df = pd.read_excel(forms_datumprikker_path)
+    
+    # Lees lessen in het datumprikker bestand, en converteer naar datetime van starttijd
+    dapri_lessen = df.columns[3:].to_list() # In format 'Kun je lesgeven op: [woensdag 01 okt	16:00 - 19:00]
+    dapri_lessen = [l.split("[")[1].split("]")[0] for l in dapri_lessen] # in format 'woensdag 01 okt	16:00 - 19:00'
+    dapri_lessen = [l.split("-")[0].replace("\t"," ") for l in dapri_lessen] # in format 'woensdag 01 okt	16:00'
+
+    # voeg jaar toe aan lessen
+    # vind jaar automatisch door naar timestamp te kijken dat form is ingevuld (gaat ervanuit dat elke datum binnen hetzelfde jaar valt)
+    timestamp = df.iloc[0,0]
+    starting_year = timestamp.year
+    dapri_lessen = [l + f"{starting_year}" for l in dapri_lessen]
+
+    # Lees nederlandse datum in
+    locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
+    dapri_lessen = [datetime.strptime(l, "%A %d %b %H:%M %Y") for l in dapri_lessen]
+    dapri_lessen_gematcht = match_lessen(dapri_lessen, lessen)
+
+    # Lees lesgevers in het datumprikker bestand
+    dapri_lesgevers = df.iloc[:,1].to_list()
+    dapri_lesgevers_gematcht = match_lesgevers(dapri_lesgevers, lesgevers)
+    ontbrekende_lesgevers = [l for l in lesgevers if l not in dapri_lesgevers_gematcht]
+
+    # Extraheer beschikbaarheid door direct de matrix te lezen, interpreteer lege cellen als Nee
+    beschikbaarheid = df.iloc[:,3:].fillna("Nee").values.tolist()
+
+    # check of er niet perongelijk lege cellen tussen zitten
+    for row in beschikbaarheid:
+        for cell in row:
+            if cell == "":
+                raise ValueError(f"Er zijn lege cellen tussen in de beschikbaarheid matrix met formaat {len(beschikbaarheid)}x{len(beschikbaarheid[0])}")
+
+    return DatumPrikker(
+        lessen=dapri_lessen_gematcht,
+        lesgevers_al_ingevuld=dapri_lesgevers_gematcht,
+        lesgevers_nog_te_vullen=ontbrekende_lesgevers,
+        beschikbaarheid=beschikbaarheid)
+
+
+def match_lessen(dapri_lessen: list[datetime], lessen: list[Les]) -> list[Les]:
     """Controleert dat elke les in de datumprikker gematcht kan worden met eentje in de planning.
     Andersom is niet verplicht. Maar wordt wel vermeld."""
-    planning_ids = [l.id() for l in lessen]
+    planning_ids = [l.datetime() for l in lessen]
     dapri_lessen_gematcht = []
     for dapri_les in dapri_lessen:
         if dapri_les not in planning_ids:
             # Find and print the closest match for debugging
-            planning_ids_distances = [(pid, levenshtein_distance(dapri_les, pid)) for pid in planning_ids]
+            planning_ids_distances = [(pid, abs((dapri_les - pid).total_seconds())) for pid in planning_ids]
             closest_match = min(planning_ids_distances, key=lambda x: x[1])
-            print(f"Dichtstbijzijnde match voor '{dapri_les}' is '{closest_match[0]}' (afstand: {closest_match[1]})")
+            print(f"Dichtstbijzijnde match voor '{dapri_les}' is '{closest_match[0]}' (afstand: {closest_match[1]} seconden)")
             raise ValueError(f"Les {dapri_les} niet gevonden in planning! Pas de spreadsheet handmatig aan om het conflict op te lossen.")
         dapri_lessen_gematcht.append(lessen[planning_ids.index(dapri_les)])
     for planning_les in planning_ids:
@@ -98,7 +141,8 @@ def distance(naam_dapri, naam_volledig) -> float:
     """Berekent de edit distance tussen twee namen, houdt rekening met dat eventueel alleen de voornaam in de datumprikker is gebruikt.."""
     volledige_match = levenshtein_distance(naam_dapri.lower(), naam_volledig.lower())
     alleen_voornaam = levenshtein_distance(naam_dapri.lower(), naam_volledig.split(" ")[0].lower())
-    return min(volledige_match, alleen_voornaam)
+    alleen_voornaam_andersom = levenshtein_distance(naam_dapri.split(" ")[0].lower(), naam_volledig)
+    return min(volledige_match, alleen_voornaam, alleen_voornaam_andersom)
 
 def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
     """Importeert planning uit een xlsx bestand. Sheet 'Planning' wordt gebruikt.
@@ -131,10 +175,7 @@ def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
     # Vind lesgevers als alle kolommen tussen Tijd en Info
     tijd_idx = df.columns.get_loc("Tijd") if "Tijd" in df.columns else 3
     info_idx = df.columns.get_loc("Info") if "Info" in df.columns else len(df.columns) - 1
-    lesgever_columns = [df.columns[i] for i in range(tijd_idx + 1, info_idx)]
-    print(f"Tijd idx: {tijd_idx}, Info idx: {info_idx}")
-    print(f"Lesgever kolommen: {lesgever_columns}")
-    
+    lesgever_columns = [df.columns[i] for i in range(tijd_idx + 1, info_idx)]   
     lessen = []
     
     for _, row in df.iterrows():
