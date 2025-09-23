@@ -8,8 +8,8 @@ penalty_geen_ervaren_lesgever: 5    # Als een les geen ervaren lesgever heeft
 penalty_meerdere_lessen_per_week: 8 # Voor elke les meer dan 1 die dezezelfde persoon per week geeft
 
 # Workload verdeling parameters
-richtlijn_lessen_per_week: 0.5      # Target: één les per X weken (0.5 = elke 2 weken)
-penalty_boven_richtlijn: 8          # Groeit steeds sneller, eerste les extra is 1x, daarbovenop is 2x, dan 3x etc.
+richtlijn_lessen_per_week: 0.4      # Target: één les per X weken (0.5 = elke 2 weken)
+penalty_boven_richtlijn: 4          # Groeit steeds sneller, eerste les extra is 1x, daarbovenop is 2x, dan 3x etc.
 
 # Bonus scores
 lesgever_bonus: 3                    # Meer lesgevers is beter
