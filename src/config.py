@@ -71,7 +71,9 @@ class RoosterConfig(BaseModel):
     penalty_misschien: float = 8
     penalty_geen_ervaren_lesgever: float = 5
     penalty_meerdere_lessen_per_week: float = 8
-    penalty_ongelijk_verdeeld: float = 5
+    richtlijn_lessen_per_week: float = 0.5
+    penalty_boven_richtlijn: float = 5
+    penalty_verdeling_stappen: List[float] = [1, 2, 3, 4, 5]  # Quadratic growth: 1, 3, 6, 10, 15
     lesgever_minimum: int = 2
     lesgever_maximum: int = 3   
     lesgever_bonus: float = 3

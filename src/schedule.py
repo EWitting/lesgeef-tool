@@ -1,4 +1,5 @@
 import ortools.sat.python.cp_model as cp_model
+import numpy as np
 from .config import RoosterConfig
 from .models import Les, Lesgever, Planning, DatumPrikker
 
@@ -130,14 +131,28 @@ def _make_model(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: R
                 model.Add(extra_lessen_in_week >= 0)
                 objective_terms.append(config.penalty_meerdere_lessen_per_week * extra_lessen_in_week)
 
-    # Soft Constraint: Pentalty per ongelijk verdeeldheid van lessen (max-min)
-    min_assignments = model.NewIntVar(0, len(lessen), 'min_assignments')
-    max_assignments = model.NewIntVar(0, len(lessen), 'max_assignments')
-    for index_lesgever in range(len(lesgevers)):
-        lesgever_total = sum(assignments_per_lesgever[index_lesgever])
-        model.Add(lesgever_total >= min_assignments)
-        model.Add(lesgever_total <= max_assignments)
-    objective_terms.append(config.penalty_ongelijk_verdeeld * (max_assignments - min_assignments))
+    # Soft Constraint: Nonlinear workload distribution penalty using piecewise linear approximation
+    if len(lesgevers) > 0 and len(lessen) > 0:
+        # Calculate baseline: based on config.richtlijn_lessen_per_week and number of weeks
+        all_weeks = set((les.datum.isocalendar()[0], les.datum.isocalendar()[1]) for les in lessen)
+        aantal_weken = len(all_weeks) if all_weeks else 1
+        baseline_int = int(np.round(config.richtlijn_lessen_per_week * aantal_weken))
+        baseline_per_lesgever = max(1, baseline_int)
+    
+        # Apply penalty for each assignment above baseline (quadratic growth via cumulative effect)
+        for index_lesgever in range(len(lesgevers)):
+            lesgever_total = sum(assignments_per_lesgever[index_lesgever])
+            
+            # Apply penalty for each level above baseline
+            for excess_level in range(len(config.penalty_verdeling_stappen)):
+                # Binary indicator: exceeds_level == 1  <=>  lesgever_total >= baseline + excess_level
+                exceeds_level = model.NewBoolVar(f"exceeds_{index_lesgever}_{excess_level}")
+                threshold = baseline_per_lesgever + excess_level + 1
+                model.Add(lesgever_total >= threshold).OnlyEnforceIf(exceeds_level)
+                model.Add(lesgever_total <= threshold - 1).OnlyEnforceIf(exceeds_level.Not())
+                
+                penalty = config.penalty_boven_richtlijn * config.penalty_verdeling_stappen[excess_level]
+                objective_terms.append(penalty * exceeds_level)
 
     
     # Solve
