@@ -73,14 +73,15 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
             rapport_onderdelen.append(f"📅 {les.datum.strftime('%a %d %b')} {les.tijd}")
         rapport_onderdelen.append("")
     
-    # Lesgever statistieken
-    if lesgever_stats:
-        rapport_onderdelen.append("=== LESGEVER VERDELING ===")
-        sorted_stats = sorted(lesgever_stats.items(), key=lambda x: x[1], reverse=True)
-        for lesgever_naam, aantal in sorted_stats[:10]:  # Top 10
-            rapport_onderdelen.append(f"{lesgever_naam}: {aantal} lessen")
+    # Incomplete lessen
+    if lessen_tekort:
+        rapport_onderdelen.append("=== LESSEN MET TE WEINIG LESGEVERS ===")
+        for les in lessen_tekort:
+            rapport_onderdelen.append(
+                f"📅 {les.datum.strftime('%a %d %b')} {les.tijd} ({len(les.lesgevers)}/{config.lesgever_minimum})"
+            )
         rapport_onderdelen.append("")
-    
+        
     # Misschien indelingen
     if misschien_lessen:
         rapport_onderdelen.append("=== MISSCHIEN INDELINGEN ===")
@@ -88,6 +89,15 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
             lgv_namen = [lg.naam for lg in lesgevers]
             rapport_onderdelen.append(f"{les.datum.strftime('%a %d %b')} {les.tijd}: {', '.join(lgv_namen)}")
         rapport_onderdelen.append("")
+
+    # Lesgever statistieken
+    if lesgever_stats:
+        rapport_onderdelen.append("=== LESGEVER VERDELING ===")
+        sorted_stats = sorted(lesgever_stats.items(), key=lambda x: x[1], reverse=True)
+        for lesgever_naam, aantal in sorted_stats:  # Top 10
+            rapport_onderdelen.append(f"{lesgever_naam}: {aantal} lessen")
+        rapport_onderdelen.append("")
+
     
     # Week conflicten
     if week_conflicten:
@@ -112,10 +122,12 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
 def _bereken_lesgever_stats(datumprikker: DatumPrikker) -> dict[str, int]:
     """Berekent hoeveel lessen elke lesgever heeft gekregen."""
     stats = {}
+    is_beschikbaar = (np.array(datumprikker.beschikbaarheid) != 'Nee').any(axis=1)
+    for lesgever_index in np.where(is_beschikbaar)[0]:
+        stats[datumprikker.lesgevers_al_ingevuld[lesgever_index].naam] = 0
     for les in datumprikker.lessen:
-        if les.lesgevers:
-            for lesgever in les.lesgevers:
-                stats[lesgever.naam] = stats.get(lesgever.naam, 0) + 1
+        for lesgever in les.lesgevers:
+            stats[lesgever.naam] = stats.get(lesgever.naam, 0) + 1
     return stats
 
 
