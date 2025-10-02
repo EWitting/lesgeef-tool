@@ -7,7 +7,8 @@ from Levenshtein import distance as levenshtein_distance
 import locale
 
 def import_lesgevers(lesgevers_path: str) -> list[Lesgever]:
-    """Importeert lesgevers uit een xlsx bestand. Sheet 'Lesgevers' wordt gebruikt."""
+    """Importeert lesgevers uit een xlsx bestand. Sheet 'Lesgevers' wordt gebruikt.
+    Truncate namen naar alleen voornaam als de voornaam uniek is."""
     xls = pd.ExcelFile(lesgevers_path)
     df = pd.read_excel(xls, sheet_name="Lesgevers")
 
@@ -27,7 +28,22 @@ def import_lesgevers(lesgevers_path: str) -> list[Lesgever]:
             raise ValueError(f"Actief string {actief_string} is niet true/false of ja/nee")
         return Lesgever(naam=row["Naam"], ervaring_jaren=row[ervaring_kolom], actief=actief)
     
-    return [row_to_lesgever(row) for _, row in df.iterrows()]
+    lesgevers = [row_to_lesgever(row) for _, row in df.iterrows()]
+    
+    # Truncate naar voornaam als uniek
+    first_names = {}
+    for lesgever in lesgevers:
+        first_name = lesgever.naam.split()[0]
+        if first_name not in first_names:
+            first_names[first_name] = []
+        first_names[first_name].append(lesgever)
+    
+    # Voor elke unieke voornaam, truncate de naam
+    for first_name, lesgevers_with_name in first_names.items():
+        if len(lesgevers_with_name) == 1:
+            lesgevers_with_name[0].naam = first_name
+    
+    return lesgevers
 
 def import_datumprikker(datumprikker_path: str, lessen: list[Les], lesgevers: list[Lesgever]) -> DatumPrikker:
     """Matcht de datumprikker excel met de lessen en lesgevers. De output is een DatumPrikker model.
