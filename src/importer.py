@@ -44,7 +44,8 @@ def import_datumprikker(datumprikker_path: str, lessen: list[Les], lesgevers: li
     # Lees lesgevers in het datumprikker bestand
     dapri_lesgevers = df.iloc[4:,0].to_list()
     dapri_lesgevers_gematcht = match_lesgevers(dapri_lesgevers, lesgevers)
-    ontbrekende_lesgevers = [l for l in lesgevers if l not in dapri_lesgevers_gematcht]
+    # Alleen actieve lesgevers toevoegen aan nog_te_vullen
+    ontbrekende_lesgevers = [l for l in lesgevers if l not in dapri_lesgevers_gematcht and l.actief]
 
     # Extraheer beschikbaarheid door direct de matrix te lezen
     beschikbaarheid = df.iloc[4:,2:].values.tolist()
@@ -86,7 +87,8 @@ def import_forms_datumprikker(forms_datumprikker_path: str, lessen: list[Les], l
     # Lees lesgevers in het datumprikker bestand
     dapri_lesgevers = df.iloc[:,1].to_list()
     dapri_lesgevers_gematcht = match_lesgevers(dapri_lesgevers, lesgevers)
-    ontbrekende_lesgevers = [l for l in lesgevers if l not in dapri_lesgevers_gematcht]
+    # Alleen actieve lesgevers toevoegen aan nog_te_vullen
+    ontbrekende_lesgevers = [l for l in lesgevers if l not in dapri_lesgevers_gematcht and l.actief]
 
     # Extraheer beschikbaarheid door direct de matrix te lezen, interpreteer lege cellen als Nee
     beschikbaarheid = df.iloc[:,3:].fillna("Nee").values.tolist()
@@ -113,9 +115,13 @@ def match_lessen(dapri_lessen: list[datetime], lessen: list[Les]) -> list[Les]:
         if dapri_les not in planning_ids:
             # Find and print the closest match for debugging
             planning_ids_distances = [(pid, abs((dapri_les - pid).total_seconds())) for pid in planning_ids]
-            closest_match = min(planning_ids_distances, key=lambda x: x[1])
-            print(f"Dichtstbijzijnde match voor '{dapri_les}' is '{closest_match[0]}' (afstand: {closest_match[1]} seconden)")
-            raise ValueError(f"Les {dapri_les} niet gevonden in planning! Pas de spreadsheet handmatig aan om het conflict op te lossen.")
+            match, distance = min(planning_ids_distances, key=lambda x: x[1])
+            if distance < 60 * 60 * 3: # 3 uur marge
+                dapri_les = match
+                print(f"Let op: Les {dapri_les} is gekoppeld aan {match}, maar is niet op hetzelfde tijdstip.")
+            else:
+                print(f"Dichtstbijzijnde match voor '{dapri_les}' is '{match}' (afstand: {distance//3600} uur)")
+                raise ValueError(f"Les {dapri_les} niet gevonden in planning! Pas de spreadsheet handmatig aan om het conflict op te lossen.")
         dapri_lessen_gematcht.append(lessen[planning_ids.index(dapri_les)])
     for planning_les in planning_ids:
         if planning_les not in dapri_lessen:
@@ -241,7 +247,7 @@ def import_planning(excel_path: str, starting_year: int = 2025) -> Planning:
         
         # Bepaal of les doorgaat (als er "Geen les" staat, gaat het niet door)
         gaat_door = True
-        if any("Geen les" in str(row[col]) for col in lesgever_columns if col in row and not pd.isna(row[col])):
+        if any("geen les" in str(row[col]).lower() for col in lesgever_columns if col in row and not pd.isna(row[col])):
             gaat_door = False
             lesgevers = []  # Clear lesgevers als les niet doorgaat
         

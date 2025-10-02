@@ -1,4 +1,5 @@
 import numpy as np
+from datetime import date
 from .models import Planning, DatumPrikker, Lesgever, Les
 from .config import RoosterConfig
 
@@ -23,8 +24,13 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
     beschikbaar_ingevuld = (np.array(datumprikker.beschikbaarheid) != 'Nee').any(axis=1).sum()
 
     # --- Rooster Status ---
+    vandaag = date.today()
     ingevulde_lessen = [les for les in datumprikker.lessen if les.lesgevers and len(les.lesgevers) > 0]
-    niet_ingevulde_lessen = [les for les in datumprikker.lessen if not les.lesgevers or len(les.lesgevers) == 0]
+    # Alleen lessen die doorgaan, niet ingevuld zijn, en in de toekomst liggen (geen "Geen les" en geen verleden)
+    niet_ingevulde_lessen = [les for les in datumprikker.lessen 
+                              if les.gaat_door 
+                              and les.datum >= vandaag
+                              and (not les.lesgevers or len(les.lesgevers) == 0)]
     
     # Lessen met te weinig lesgevers
     lessen_tekort = [les for les in ingevulde_lessen if len(les.lesgevers) < config.lesgever_minimum]
@@ -53,8 +59,13 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
     rapport_onderdelen.append("")
     
     # Rooster sectie
+    totaal_lessen_doorgaan = sum(1 for les in datumprikker.lessen if les.gaat_door)
+    geen_les_count = sum(1 for les in datumprikker.lessen if not les.gaat_door)
+    
     rapport_onderdelen.append("=== ROOSTER STATUS ===")
-    rapport_onderdelen.append(f"📚 Totaal lessen: {len(datumprikker.lessen)}")
+    rapport_onderdelen.append(f"📚 Totaal lessen: {totaal_lessen_doorgaan} lessen")
+    if geen_les_count > 0:
+        rapport_onderdelen.append(f"🚫 Gaat niet door (Geen les): {geen_les_count} lessen")
     rapport_onderdelen.append(f"✅ Ingevuld: {len(ingevulde_lessen)} lessen")
     rapport_onderdelen.append(f"❌ Niet ingevuld: {len(niet_ingevulde_lessen)} lessen")
     
@@ -120,23 +131,28 @@ def generate_report(planning: Planning, datumprikker: DatumPrikker, config: Roos
 
 
 def _bereken_lesgever_stats(datumprikker: DatumPrikker) -> dict[str, int]:
-    """Berekent hoeveel lessen elke lesgever heeft gekregen."""
+    """Berekent hoeveel lessen elke lesgever heeft gekregen (exclusief "Geen les")."""
     stats = {}
     is_beschikbaar = (np.array(datumprikker.beschikbaarheid) != 'Nee').any(axis=1)
     for lesgever_index in np.where(is_beschikbaar)[0]:
         stats[datumprikker.lesgevers_al_ingevuld[lesgever_index].naam] = 0
+    # Alleen lessen die doorgaan tellen
     for les in datumprikker.lessen:
-        for lesgever in les.lesgevers:
-            stats[lesgever.naam] = stats.get(lesgever.naam, 0) + 1
+        if not les.gaat_door:
+            continue
+        if les.lesgevers:
+            for lesgever in les.lesgevers:
+                stats[lesgever.naam] = stats.get(lesgever.naam, 0) + 1
     return stats
 
 
 def _vind_misschien_lessen(datumprikker: DatumPrikker) -> list[tuple[Les, list[Lesgever]]]:
-    """Vindt alle lessen waar iemand met 'Misschien' is ingedeeld."""
+    """Vindt alle lessen waar iemand met 'Misschien' is ingedeeld (exclusief "Geen les")."""
     misschien_lessen = []
     
     for les in datumprikker.lessen:
-        if not les.lesgevers:
+        # Skip lessen die niet doorgaan
+        if not les.gaat_door or not les.lesgevers:
             continue
             
         misschien_lesgevers = []
@@ -152,13 +168,14 @@ def _vind_misschien_lessen(datumprikker: DatumPrikker) -> list[tuple[Les, list[L
 
 
 def _vind_week_conflicten(datumprikker: DatumPrikker) -> dict[str, dict[str, list[Les]]]:
-    """Vindt lesgevers die meerdere lessen in dezelfde week hebben."""
+    """Vindt lesgevers die meerdere lessen in dezelfde week hebben (exclusief "Geen les")."""
     week_conflicten = {}
     
     # Groepeer lessen per week en lesgever
     lesgever_weeks = {}
     for les in datumprikker.lessen:
-        if not les.lesgevers:
+        # Skip lessen die niet doorgaan
+        if not les.gaat_door or not les.lesgevers:
             continue
             
         week_key = f"{les.datum.year}-W{les.datum.isocalendar()[1]:02d}"
