@@ -131,6 +131,10 @@ def merge_cells(worksheet: xlsxwriter.worksheet, column: int, ranges: list[int],
             end_row = bottom + HEADER_ROWS
             range_spec = f'{col_to_char(column)}{start_row}:{col_to_char(column)}{end_row}'
             worksheet.merge_range(range_spec, values[top], format)
+        else:
+            # Keep styling identical to merged cells, even for a single row.
+            row = top + HEADER_ROWS
+            worksheet.write(row, column, values[top], format)
 
 
     

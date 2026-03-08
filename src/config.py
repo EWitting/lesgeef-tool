@@ -73,6 +73,7 @@ class RoosterConfig(BaseModel):
     penalty_meerdere_lessen_per_week: float = 8
     richtlijn_lessen_per_week: float = 0.5
     penalty_boven_richtlijn: float = 5
+    penalty_onder_richtlijn: float = 2
     penalty_verdeling_stappen: List[float] = [1, 2, 3, 4, 5]  # Quadratic growth: 1, 3, 6, 10, 15
     lesgever_minimum: int = 2
     lesgever_maximum: int = 3   

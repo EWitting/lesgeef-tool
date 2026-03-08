@@ -253,7 +253,6 @@ def _make_model(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: R
             
             # Apply penalty for each level above baseline
             for excess_level in range(len(config.penalty_verdeling_stappen)):
-                # Binary indicator: exceeds_level == 1  <=>  lesgever_total >= baseline + excess_level
                 exceeds_level = model.NewBoolVar(f"exceeds_{index_lesgever}_{excess_level}")
                 threshold = baseline_per_lesgever + excess_level + 1
                 model.Add(lesgever_total >= threshold).OnlyEnforceIf(exceeds_level)
@@ -261,6 +260,18 @@ def _make_model(lesgevers: list[Lesgever], datumprikker: DatumPrikker, config: R
                 
                 penalty = config.penalty_boven_richtlijn * config.penalty_verdeling_stappen[excess_level]
                 objective_terms.append(penalty * exceeds_level)
+
+            # Apply penalty for each level below baseline (mirror of above)
+            for deficit_level in range(len(config.penalty_verdeling_stappen)):
+                threshold = baseline_per_lesgever - deficit_level - 1
+                if threshold < 0:
+                    break
+                below_level = model.NewBoolVar(f"below_{index_lesgever}_{deficit_level}")
+                model.Add(lesgever_total <= threshold).OnlyEnforceIf(below_level)
+                model.Add(lesgever_total >= threshold + 1).OnlyEnforceIf(below_level.Not())
+                
+                penalty = config.penalty_onder_richtlijn * config.penalty_verdeling_stappen[deficit_level]
+                objective_terms.append(penalty * below_level)
 
     
     # Solve

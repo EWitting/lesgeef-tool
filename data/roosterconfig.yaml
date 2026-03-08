@@ -10,6 +10,7 @@ penalty_meerdere_lessen_per_week: 8 # Voor elke les meer dan 1 die dezezelfde pe
 # Workload verdeling parameters
 richtlijn_lessen_per_week: 0.4      # Target: één les per X weken (0.5 = elke 2 weken)
 penalty_boven_richtlijn: 4          # Groeit steeds sneller, eerste les extra is 1x, daarbovenop is 2x, dan 3x etc.
+penalty_onder_richtlijn: 2          # Zelfde groeiende structuur maar voor lessen onder de richtlijn
 
 # Bonus scores
 lesgever_bonus: 3                    # Meer lesgevers is beter

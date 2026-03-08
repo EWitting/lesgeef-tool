@@ -9,26 +9,18 @@ import numpy as np
 
 if __name__ == "__main__":
     # Manier 1: Parse planning uit YAML configuratie
-    # planning_config = PlanningConfig.from_yaml_file("data/planning.yml")
-    # planning = parse_planning(planning_config)
+    planning_config = PlanningConfig.from_yaml_file("data/planning.yml")
+    planning = parse_planning(planning_config)
     
     # Manier 2: Import planning direct uit Excel bestand (alternatief)
-    planning = import_planning("./data/Lesgeef Planning 2025-2026.xlsx", starting_year=2025)
+    # planning = import_planning("./data/Lesgeef Planning 2025-2026.xlsx", starting_year=2025)
 
     lesgevers_path = "./data/lesgevers.xlsx"
     lesgevers = import_lesgevers(lesgevers_path)
 
-    form_datumprikker_path = "./data/Beschikbaarheid Naseizoen 2 2025 (Responses).xlsx"
+    form_datumprikker_path = "./data/Beschikbaarheid Voorseizoen 1 2026 (Responses).xlsx"
     datumprikker = import_forms_datumprikker(form_datumprikker_path, planning.lessen, lesgevers)
 
-    # Tijdelijk, haal beka 1 lessen uit datupmrikker
-    # beka_lessen_idx = [idx for idx, les in enumerate(planning.lessen) if les.naam == "Beginnerskamp 1"]
-    # datumprikker.lessen = [les for les in datumprikker.lessen if les.naam != "Beginnerskamp 1"]
-    # nieuwe_beschikbaarheid = []
-    # for rij in datumprikker.beschikbaarheid:
-    #     nieuwe_rij = [waarde for i, waarde in enumerate(rij) if i not in beka_lessen_idx]
-    #     nieuwe_beschikbaarheid.append(nieuwe_rij)
-    # datumprikker.beschikbaarheid = nieuwe_beschikbaarheid
 
     print(f"Lesgevers die minimaal 1 keer kunnen: {(np.array(datumprikker.beschikbaarheid) != 'Nee').any(axis=1).sum()}")
     print(f"Lesgevers al ingevuld: {len(datumprikker.lesgevers_al_ingevuld)}")
