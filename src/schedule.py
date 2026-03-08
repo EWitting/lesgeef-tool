@@ -54,8 +54,7 @@ def schedule_lessons(datumprikker: DatumPrikker, config: RoosterConfig) -> None:
         model, assignments = _make_model(lesgevers, datumprikker, config, hard_min=False)
         status = solver.Solve(model)
         if status not in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-            print("Geen oplossing gevonden!")
-            return
+            raise RuntimeError("Geen oplossing gevonden! Controleer de configuratie en beschikbaarheid.")
 
     # Vul de planning in, dit kan door de Les objecten te updaten
     # Skip lessen die niet doorgaan (gaat_door == False) - die blijven leeg

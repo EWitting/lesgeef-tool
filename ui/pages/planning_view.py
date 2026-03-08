@@ -1,20 +1,20 @@
 """Schedule view with AG Grid: dropdown editing, Misschien highlighting, auto-fill."""
+
 from __future__ import annotations
 
 import asyncio
-from nicegui import ui
+import json
+import os
+import tempfile
 
-from src.models import Lesgever, Les
+from nicegui import events, ui
+
+from src.models import Les, Lesgever
 from src.report import vind_beschikaarheid
 from ui.state import state
 
-
 LESGEVER_COLS = 3
 _AG_FIX_JS = "document.querySelectorAll('.ag-delay-render').forEach(el => el.classList.remove('ag-delay-render'));"
-
-# Held across calls so we can do in-place data updates without grid recreation
-_grid_ref: ui.aggrid | None = None
-_last_has_dp: bool | None = None  # track whether datumprikker was loaded when grid was built
 
 
 def create_planning_tab():
@@ -28,65 +28,130 @@ def create_planning_tab():
             icon="auto_fix_high",
             on_click=lambda: _run_scheduler(grid_container, status, run_btn),
         ).props("color=primary dense")
+        refill_btn = ui.button(
+            "Reset + Auto-fill",
+            icon="auto_fix_high",
+            on_click=lambda: _reset_and_fill(grid_container, status, refill_btn),
+        ).props("color=primary dense outline")
+        ui.upload(
+            label="Importeer .xlsx",
+            auto_upload=True,
+            on_upload=lambda e: _handle_import_xlsx(e, grid_container, status),
+        ).props('accept=".xlsx,.xls" flat dense bordered').classes("max-w-xs")
+        ui.button(
+            "Reset rooster",
+            icon="clear_all",
+            on_click=lambda: _clear_assignments(grid_container, status),
+        ).props("flat dense color=negative")
         ui.button(
             "Ververs",
             icon="refresh",
-            on_click=lambda: _rebuild_grid(grid_container, status),
+            on_click=lambda: _render(grid_container, status),
         ).props("flat dense")
 
-    _rebuild_grid(grid_container, status)
+    _render(grid_container, status)
+
+
+async def _handle_import_xlsx(
+    e: events.UploadEventArguments, container: ui.column, status: ui.label
+):
+    try:
+        data = await e.file.read()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp.write(data)
+        tmp.close()
+        from datetime import date
+
+        state.load_planning_from_excel(tmp.name, starting_year=date.today().year)
+        os.unlink(tmp.name)
+        _render(container, status)
+        n = len(state.planning.lessen) if state.planning else 0
+        _show_status(status, f"Planning geïmporteerd: {n} lessen.", positive=True)
+        ui.notify(f"Planning geïmporteerd uit Excel: {n} lessen", type="positive")
+    except Exception as ex:
+        _show_status(status, f"Fout: {ex}", positive=False)
+        ui.notify(str(ex), type="negative")
+
+
+async def _reset_and_fill(container: ui.column, status: ui.label, btn: ui.button):
+    _clear_assignments(container, status)
+    await _run_scheduler(container, status, btn)
+
+
+def _clear_assignments(container: ui.column, status: ui.label):
+    """Clear all lesgever assignments from future lessons."""
+    if state.planning is None:
+        return
+    from datetime import date
+
+    today = date.today()
+    cleared = 0
+    for les in state.planning.lessen:
+        if les.gaat_door and les.datum >= today and les.lesgevers:
+            les.lesgevers = []
+            cleared += 1
+    state.refresh_report()
+    state._notify()
+    _render(container, status)
+    _show_status(status, f"{cleared} lessen gewist.", positive=True)
+    ui.notify(f"Lesgevers gewist uit {cleared} toekomstige lessen", type="info")
 
 
 async def _run_scheduler(container: ui.column, status: ui.label, btn: ui.button):
     btn.props("loading")
-    status.text = "Scheduler bezig..."
+    _show_status(status, "Scheduler bezig...")
     try:
-        # Run OR-Tools in a thread so the event loop stays responsive
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, state.run_scheduler)
-        await _update_grid_data(container, status)
+        state.refresh_report()
         state._notify()
-        status.set_text("Scheduler voltooid.")
-        status.classes(remove="text-negative", add="text-positive")
-        status.set_visibility(True)
+        _render(container, status)
+        _show_status(status, "Scheduler voltooid.", positive=True)
         ui.notify("Rooster automatisch ingevuld", type="positive")
     except Exception as e:
-        status.set_text(f"Fout: {e}")
-        status.classes(remove="text-positive", add="text-negative")
-        status.set_visibility(True)
+        _show_status(status, f"Fout: {e}", positive=False)
         ui.notify(str(e), type="negative")
     finally:
         btn.props(remove="loading")
 
 
-def _rebuild_grid(container: ui.column, status: ui.label):
-    """Fully recreate the grid (needed when column defs change, e.g. after loading datumprikker)."""
-    global _grid_ref, _last_has_dp
+def _show_status(status: ui.label, text: str, positive: bool | None = None):
+    status.set_text(text)
+    status.set_visibility(True)
+    if positive is True:
+        status.classes(remove="text-negative", add="text-positive")
+    elif positive is False:
+        status.classes(remove="text-positive", add="text-negative")
+
+
+def _render(container: ui.column, status: ui.label):
+    """Always do a full grid rebuild -- simple and reliable."""
     container.clear()
-    _grid_ref = None
 
     if state.planning is None:
         with container:
-            ui.label("Geen planning geladen. Ga naar 'Planning YAML' om te beginnen.").classes("text-grey-6")
+            ui.label(
+                "Geen planning geladen. Ga naar 'Planning YAML' om te beginnen."
+            ).classes("text-grey-6")
         return
 
     rows, col_defs, availability_js = _build_grid_data()
-    has_dp = state.datumprikker is not None
-    _last_has_dp = has_dp
 
     with container:
-        _grid_ref = ui.aggrid({
-            "columnDefs": col_defs,
-            "rowData": rows,
-            "defaultColDef": {"sortable": True, "resizable": True},
-            ":isFullWidthRow": "params => !!(params.rowNode.data && params.rowNode.data._is_season_header)",
-            ":fullWidthCellRenderer": """params => {
+        grid = (
+            ui.aggrid(
+                {
+                    "columnDefs": col_defs,
+                    "rowData": rows,
+                    "defaultColDef": {"sortable": True, "resizable": True},
+                    ":isFullWidthRow": "params => !!(params.rowNode.data && params.rowNode.data._is_season_header)",
+                    ":fullWidthCellRenderer": """params => {
                 const div = document.createElement('div');
                 div.style.cssText = 'background: #2c5282; color: white; font-weight: bold; font-size: 13px; padding: 0 16px; display: flex; align-items: center; height: 100%; letter-spacing: 0.05em;';
                 div.textContent = params.data._season_name || '';
                 return div;
             }""",
-            ":getRowStyle": """params => {
+                    ":getRowStyle": """params => {
                 if (!params.data || params.data._is_season_header) return;
                 var even = params.data._week % 2 === 0;
                 if (params.data._gaat_door === false) {
@@ -94,33 +159,19 @@ def _rebuild_grid(container: ui.column, status: ui.label):
                 }
                 return {background: even ? '#dce6f1' : '#f0f0f0'};
             }""",
-        }).classes("w-full").style("height: 700px;")
-        _grid_ref.on("cellValueChanged", lambda e: _on_cell_edit(e, container, status))
+                }
+            )
+            .classes("w-full")
+            .style("height: 700px;")
+        )
+        grid.on("cellValueChanged", lambda e: _on_cell_edit(e, container, status))
 
     ui.run_javascript(f"window._lesgeefAvail = {availability_js};")
-    ui.run_javascript(_AG_FIX_JS)
-
-
-async def _update_grid_data(container: ui.column, status: ui.label):
-    """Update row data in-place if the grid already exists; rebuild if column defs changed."""
-    global _grid_ref, _last_has_dp
-    has_dp = state.datumprikker is not None
-
-    if _grid_ref is None or _last_has_dp != has_dp:
-        # Column defs changed (datumprikker loaded/unloaded) — full rebuild needed
-        _rebuild_grid(container, status)
-        return
-
-    rows, _col_defs, availability_js = _build_grid_data()
-    # Update row data without destroying the grid element
-    await _grid_ref.run_grid_method("setGridOption", "rowData", rows)
-    ui.run_javascript(f"window._lesgeefAvail = {availability_js};")
-    ui.run_javascript(_AG_FIX_JS)
+    ui.timer(0.2, lambda: ui.run_javascript(_AG_FIX_JS), once=True)
 
 
 def _build_grid_data() -> tuple[list[dict], list[dict], str]:
-    """Build AG Grid row data, column definitions, and per-row availability JS from current planning."""
-    import json
+    """Build AG Grid row data, column definitions, and per-row availability JS."""
     planning = state.planning
     dp = state.datumprikker
     has_dp = dp is not None
@@ -128,8 +179,18 @@ def _build_grid_data() -> tuple[list[dict], list[dict], str]:
     boundary = {"week-boundary": "data && data['_new_week'] === true"}
 
     col_defs: list[dict] = [
-        {"headerName": "Datum", "field": "datum", "width": 130, "cellClassRules": boundary},
-        {"headerName": "Tijd", "field": "tijd", "width": 120, "cellClassRules": boundary},
+        {
+            "headerName": "Datum",
+            "field": "datum",
+            "width": 130,
+            "cellClassRules": boundary,
+        },
+        {
+            "headerName": "Tijd",
+            "field": "tijd",
+            "width": 120,
+            "cellClassRules": boundary,
+        },
     ]
 
     for i in range(LESGEVER_COLS):
@@ -145,8 +206,6 @@ def _build_grid_data() -> tuple[list[dict], list[dict], str]:
         if has_dp:
             col_def["editable"] = True
             col_def["cellEditor"] = "agSelectCellEditor"
-            # `:` prefix = evaluated as JS function on client; reads per-row availability
-            # from the window._lesgeefAvail global we inject after grid creation.
             col_def[":cellEditorParams"] = (
                 "params => { "
                 "  var idx = params.data._idx; "
@@ -156,10 +215,15 @@ def _build_grid_data() -> tuple[list[dict], list[dict], str]:
             )
         col_defs.append(col_def)
 
-    col_defs.append({"headerName": "Info", "field": "info", "width": 200, "cellClassRules": boundary})
+    col_defs.append(
+        {
+            "headerName": "Info",
+            "field": "info",
+            "width": 200,
+            "cellClassRules": boundary,
+        }
+    )
 
-    # Build per-row availability lookup: {lesson_idx: ["", "Alice", "⚠ Bob", ...]}
-    # "" = unassign, plain names = Ja, "⚠ name" = Misschien
     availability: dict[int, list[str]] = {}
     rows: list[dict] = []
     prev_week: int | None = None
@@ -169,11 +233,10 @@ def _build_grid_data() -> tuple[list[dict], list[dict], str]:
         week = les.datum.isocalendar()[1]
         seizoen_naam = les.seizoen.naam if les.seizoen else ""
 
-        # Insert a full-width season header row when the season changes
         if seizoen_naam and seizoen_naam != prev_seizoen:
             rows.append({"_is_season_header": True, "_season_name": seizoen_naam})
             prev_seizoen = seizoen_naam
-            prev_week = None  # reset so first week of new season also gets a boundary line
+            prev_week = None
 
         row: dict = {
             "_idx": idx,
@@ -213,7 +276,6 @@ def _build_grid_data() -> tuple[list[dict], list[dict], str]:
     return rows, col_defs, availability_js
 
 
-
 async def _on_cell_edit(e, container: ui.column, status: ui.label):
     """Handle inline cell edits: update the Les model and refresh report."""
     args = e.args
@@ -226,12 +288,10 @@ async def _on_cell_edit(e, container: ui.column, status: ui.label):
     if row_data.get("_is_season_header"):
         return
 
-    # Use _idx from row data -- robust against inserted season header rows
     les_idx = row_data.get("_idx")
     if les_idx is None:
         return
 
-    # Strip the ⚠ prefix used to indicate Misschien in the dropdown
     clean_value = str(new_value).removeprefix("⚠ ") if new_value else ""
 
     col_i = int(field.split("_")[1])
@@ -242,8 +302,9 @@ async def _on_cell_edit(e, container: ui.column, status: ui.label):
 
     _update_lesgever_assignment(les, col_i, clean_value)
 
-    state._notify()  # triggers report_view auto-refresh via on_change callback
-    await _update_grid_data(container, status)
+    state.refresh_report()
+    state._notify()
+    _render(container, status)
 
 
 def _update_lesgever_assignment(les: Les, col_index: int, name: str):

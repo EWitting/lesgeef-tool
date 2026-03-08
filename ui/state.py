@@ -8,7 +8,7 @@ from typing import Callable
 
 from src.config import PlanningConfig, RoosterConfig
 from src.export import export_planning
-from src.importer import import_forms_datumprikker, import_lesgevers
+from src.importer import import_forms_datumprikker, import_lesgevers, import_planning
 from src.models import DatumPrikker, Lesgever, Les, Planning
 from src.parse import parse_planning
 from src.report import generate_report, vind_beschikaarheid
@@ -64,6 +64,10 @@ class AppState:
     def load_planning_from_yaml_string(self, text: str) -> None:
         config = PlanningConfig.from_yaml_string(text)
         self.planning = parse_planning(config)
+        self._notify()
+
+    def load_planning_from_excel(self, path: str | Path, starting_year: int = 2025) -> None:
+        self.planning = import_planning(str(path), starting_year=starting_year)
         self._notify()
 
     def load_lesgevers(self, path: str | Path) -> None:
