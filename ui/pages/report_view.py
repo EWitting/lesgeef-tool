@@ -5,10 +5,11 @@ from ui.state import state
 
 
 _report_display: ui.code | None = None
+_callback_registered = False
 
 
 def create_report_tab():
-    global _report_display
+    global _report_display, _callback_registered
 
     ui.label("Rapport").classes("text-h6 q-mb-sm")
 
@@ -18,6 +19,11 @@ def create_report_tab():
     _report_display = ui.code("Nog geen rapport gegenereerd. Laad eerst de planning, lesgevers en datumprikker.").props(
         'language="text"'
     ).classes("w-full").style("white-space: pre-wrap; font-size: 13px; max-height: 80vh; overflow-y: auto;")
+
+    # Register once: auto-refresh whenever state changes (scheduler run, manual edits, etc.)
+    if not _callback_registered:
+        state.on_change(_refresh)
+        _callback_registered = True
 
     if state.planning and state.datumprikker:
         _refresh()
@@ -34,4 +40,3 @@ def _refresh():
     except Exception as e:
         if _report_display:
             _report_display.content = f"Fout bij genereren rapport: {e}"
-        ui.notify(str(e), type="negative")

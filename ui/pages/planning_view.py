@@ -58,7 +58,7 @@ def _render_grid(container: ui.column, status: ui.label):
             ui.label("Geen planning geladen. Ga naar 'Planning YAML' om te beginnen.").classes("text-grey-6")
         return
 
-    rows, col_defs = _build_grid_data()
+    rows, col_defs, availability_js = _build_grid_data()
 
     with container:
         grid = ui.aggrid({
@@ -73,11 +73,16 @@ def _render_grid(container: ui.column, status: ui.label):
         }).classes("w-full").style("height: 700px;")
         grid.on("cellValueChanged", lambda e: _on_cell_edit(e, grid, container, status))
 
+    # Inject per-row dropdown availability into a JS global so cellEditorParams can read it
+    ui.run_javascript(f"window._lesgeefAvail = {availability_js};")
 
-def _build_grid_data() -> tuple[list[dict], list[dict]]:
-    """Build AG Grid row data and column definitions from the current planning."""
+
+def _build_grid_data() -> tuple[list[dict], list[dict], str]:
+    """Build AG Grid row data, column definitions, and per-row availability JS from current planning."""
+    import json
     planning = state.planning
     dp = state.datumprikker
+    has_dp = dp is not None
 
     col_defs: list[dict] = [
         {"headerName": "Seizoen", "field": "seizoen", "width": 120},
@@ -85,13 +90,11 @@ def _build_grid_data() -> tuple[list[dict], list[dict]]:
         {"headerName": "Tijd", "field": "tijd", "width": 120},
     ]
 
-    has_dp = dp is not None
-
     for i in range(LESGEVER_COLS):
         col_def: dict = {
             "headerName": f"Lesgever {i + 1}",
             "field": f"lesgever_{i}",
-            "width": 140,
+            "width": 150,
             "cellClassRules": {
                 "misschien-cell": f"data && data['_misschien_{i}'] === true",
             },
@@ -99,12 +102,24 @@ def _build_grid_data() -> tuple[list[dict], list[dict]]:
         if has_dp:
             col_def["editable"] = True
             col_def["cellEditor"] = "agSelectCellEditor"
-            col_def["cellEditorParams"] = {"values": [""]}
+            # `:` prefix = evaluated as JS function on client; reads per-row availability
+            # from the window._lesgeefAvail global we inject after grid creation.
+            col_def[":cellEditorParams"] = (
+                "params => { "
+                "  var idx = params.data._idx; "
+                "  var avail = (window._lesgeefAvail && window._lesgeefAvail[idx]) || ['']; "
+                "  return { values: avail }; "
+                "}"
+            )
         col_defs.append(col_def)
 
     col_defs.append({"headerName": "Info", "field": "info", "width": 200})
 
+    # Build per-row availability lookup: {lesson_idx: ["", "Alice", "⚠ Bob", ...]}
+    # "" = unassign, plain names = Ja, "⚠ name" = Misschien
+    availability: dict[int, list[str]] = {}
     rows: list[dict] = []
+
     for idx, les in enumerate(planning.lessen):
         row: dict = {
             "_idx": idx,
@@ -119,31 +134,26 @@ def _build_grid_data() -> tuple[list[dict], list[dict]]:
             naam = ""
             is_misschien = False
             if les.lesgevers and i < len(les.lesgevers):
-                naam = les.lesgevers[i].naam
+                assigned = les.lesgevers[i]
+                naam = assigned.naam
                 if dp:
-                    b = vind_beschikaarheid(dp, les.lesgevers[i], les)
+                    b = vind_beschikaarheid(dp, assigned, les)
                     is_misschien = b == "Misschien"
             row[f"lesgever_{i}"] = naam
             row[f"_misschien_{i}"] = is_misschien
 
+        if has_dp:
+            avail_for_les = state.get_available_lesgevers_for_lesson(les)
+            options: list[str] = [""]
+            for lg, b in avail_for_les:
+                options.append(f"⚠ {lg.naam}" if b == "Misschien" else lg.naam)
+            availability[idx] = options
+
         rows.append(row)
 
-    if has_dp:
-        all_names: set[str] = {""}
-        for lg in dp.lesgevers_al_ingevuld:
-            all_names.add(lg.naam)
-        for col_def in col_defs:
-            if col_def.get("field", "").startswith("lesgever_"):
-                col_def["cellEditorParams"] = {"values": sorted(all_names)}
+    availability_js = json.dumps(availability)
+    return rows, col_defs, availability_js
 
-    return rows, col_defs
-
-
-def _get_dropdown_values(les: Les) -> list[str]:
-    """Get sorted dropdown options: Ja first, then Misschien."""
-    available = state.get_available_lesgevers_for_lesson(les)
-    names = [""] + [lg.naam for lg, _ in available]
-    return names
 
 
 def _on_cell_edit(e, grid, container: ui.column, status: ui.label):
@@ -156,15 +166,18 @@ def _on_cell_edit(e, grid, container: ui.column, status: ui.label):
     if not field.startswith("lesgever_") or state.planning is None:
         return
 
+    # Strip the ⚠ prefix used to indicate Misschien in the dropdown
+    clean_value = str(new_value).removeprefix("⚠ ") if new_value else ""
+
     col_i = int(field.split("_")[1])
     les = state.planning.lessen[row_idx]
 
     if les.lesgevers is None:
         les.lesgevers = []
 
-    _update_lesgever_assignment(les, col_i, new_value)
+    _update_lesgever_assignment(les, col_i, clean_value)
 
-    state.refresh_report()
+    state._notify()  # triggers report_view auto-refresh via on_change callback
     _render_grid(container, status)
 
 
