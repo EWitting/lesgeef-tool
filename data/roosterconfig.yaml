@@ -1,16 +1,16 @@
-# Prioriteiten voor rooster maken
-lesgever_minimum: 2                  # (Soort van) hard minimum
-lesgever_maximum: 3                  # Harde maximum
-
-penalty_lesgever_tekort: 10         # Voor elke lesgever onder minimum
-penalty_misschien: 8                # Voor elke ingeroosterde lesgever met Misschien
-penalty_geen_ervaren_lesgever: 5    # Als een les geen ervaren lesgever heeft
-penalty_meerdere_lessen_per_week: 8 # Voor elke les meer dan 1 die dezezelfde persoon per week geeft
-
-# Workload verdeling parameters
-richtlijn_lessen_per_week: 0.4      # Target: één les per X weken (0.5 = elke 2 weken)
-penalty_boven_richtlijn: 4          # Groeit steeds sneller, eerste les extra is 1x, daarbovenop is 2x, dan 3x etc.
-penalty_onder_richtlijn: 2          # Zelfde groeiende structuur maar voor lessen onder de richtlijn
-
-# Bonus scores
-lesgever_bonus: 3                    # Meer lesgevers is beter
+lesgever_bonus: 3.0
+lesgever_maximum: 3
+lesgever_minimum: 2
+penalty_boven_richtlijn: 4.0
+penalty_geen_ervaren_lesgever: 5.0
+penalty_lesgever_tekort: 10.0
+penalty_meerdere_lessen_per_week: 8.0
+penalty_misschien: 8.0
+penalty_onder_richtlijn: 2.0
+penalty_verdeling_stappen:
+- 1.0
+- 2.0
+- 3.0
+- 4.0
+- 5.0
+richtlijn_lessen_per_week: 0.4

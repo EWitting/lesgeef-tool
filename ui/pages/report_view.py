@@ -18,7 +18,7 @@ def create_report_tab():
 
     _report_display = ui.code("Nog geen rapport gegenereerd. Laad eerst de planning, lesgevers en datumprikker.").props(
         'language="text"'
-    ).classes("w-full").style("white-space: pre-wrap; font-size: 13px; max-height: 80vh; overflow-y: auto;")
+    ).classes("w-full").style("white-space: pre-wrap; font-size: 13px;")
 
     # Register once: auto-refresh whenever state changes (scheduler run, manual edits, etc.)
     if not _callback_registered:
