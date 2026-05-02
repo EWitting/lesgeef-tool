@@ -1,4 +1,6 @@
 """Report display with auto-refresh on schedule changes."""
+import traceback
+
 from nicegui import ui
 
 from ui.state import state
@@ -34,9 +36,11 @@ def _refresh():
     try:
         text = state.refresh_report()
         if not text:
+            print("[rapport] Planning of datumprikker niet geladen — rapport overgeslagen.")
             text = "Rapport kan niet worden gegenereerd. Controleer of planning, lesgevers en datumprikker geladen zijn."
         if _report_display:
             _report_display.content = text
     except Exception as e:
+        traceback.print_exc()
         if _report_display:
             _report_display.content = f"Fout bij genereren rapport: {e}"

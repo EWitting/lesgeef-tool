@@ -39,18 +39,18 @@ class AppState:
         if PLANNING_YAML_PATH.exists():
             try:
                 self.load_planning_from_yaml(PLANNING_YAML_PATH)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[state] Kon planning.yml niet laden: {e}")
         if ROOSTER_CONFIG_PATH.exists():
             try:
                 self.rooster_config = RoosterConfig.from_yaml_file(ROOSTER_CONFIG_PATH)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[state] Kon roosterconfig.yaml niet laden: {e}")
         if LESGEVERS_XLSX_PATH.exists():
             try:
                 self.lesgevers = import_lesgevers(str(LESGEVERS_XLSX_PATH))
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[state] Kon lesgevers.xlsx niet laden: {e}")
 
     # ------------------------------------------------------------------
     # Loading helpers

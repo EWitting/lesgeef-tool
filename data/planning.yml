@@ -71,10 +71,10 @@ activiteiten:
     les-gaat-door: false
   - naam: "Lustrum Trip"
     datum: "2026-05-16"
-    les-gaat-door: true
+    les-gaat-door: false
   - naam: "Lustrum Trip"
     datum: "2026-05-17"
-    les-gaat-door: true
+    les-gaat-door: false
   - naam: "Vooka"
     datum: "2026-05-30"
     les-gaat-door: false

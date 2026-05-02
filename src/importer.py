@@ -6,6 +6,21 @@ from .config import Seizoen
 from Levenshtein import distance as levenshtein_distance
 import locale
 
+_NL_MAANDEN = {
+    "jan": 1, "feb": 2, "mrt": 3, "apr": 4, "mei": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "okt": 10, "nov": 11, "dec": 12,
+}
+
+def _parse_nl_datetime(s: str) -> datetime:
+    """Parse Dutch datetime like 'woensdag 01 okt 16:00 2025' without relying on locale."""
+    parts = s.strip().split()
+    # parts: [weekday, day, month_abbr, time, year]
+    day = int(parts[1])
+    month = _NL_MAANDEN[parts[2].lower()]
+    hour, minute = map(int, parts[3].split(":"))
+    year = int(parts[4])
+    return datetime(year, month, day, hour, minute)
+
 def import_lesgevers(lesgevers_path: str) -> list[Lesgever]:
     """Importeert lesgevers uit een xlsx bestand. Sheet 'Lesgevers' wordt gebruikt.
     Truncate namen naar alleen voornaam als de voornaam uniek is."""
@@ -95,9 +110,8 @@ def import_forms_datumprikker(forms_datumprikker_path: str, lessen: list[Les], l
     starting_year = timestamp.year
     dapri_lessen = [l + f"{starting_year}" for l in dapri_lessen]
 
-    # Lees nederlandse datum in
-    locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
-    dapri_lessen = [datetime.strptime(l, "%A %d %b %H:%M %Y") for l in dapri_lessen]
+    # Lees nederlandse datum in (locale-onafhankelijk)
+    dapri_lessen = [_parse_nl_datetime(l) for l in dapri_lessen]
     dapri_lessen_gematcht = match_lessen(dapri_lessen, lessen)
 
     # Lees lesgevers in het datumprikker bestand
