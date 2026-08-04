@@ -248,3 +248,62 @@ eerdere keuze kan een latere fase raken.
   "Waarom deze score?" en de per-les solver-uitleg. Wordt gereset bij het openen/aanmaken
   van een ander project (anders zou een oude solver-run van project A worden getoond in
   project B).
+
+## 2026-08-04 — Fase 6
+
+- **`dialogen/lesgevers.py` + `ui/lesgeverbewerkingen.py` gebouwd, hoewel geen enkele
+  PLAN.md-fase dit expliciet als taak noemt.** DESIGN.md §7 noemde het bestand wel in de
+  mappenstructuur, maar PLAN.md wees het aan geen fase toe -- een gat. Zonder dit kon een
+  gebruiker via de nieuwe UI HELEMAAL GEEN lesgevers aanmaken (alleen via de nog niet
+  bestaande Excel-roster-import van fase 7), wat de app tot dan toe onbruikbaar zou maken
+  voor een nieuw project. Meegenomen in deze fase omdat rondes/antwoorden zonder lesgevers
+  toch niet te testen zijn. `verwijder_lesgever()` ruimt ook toewijzingen naar die lesgever
+  op in alle lessen, anders zou de UI blijvend '? (onbekend)' tonen.
+- **Vraagtitels bij een via het script aangemaakt formulier zijn LETTERLIJK
+  `'{label} #{index}'`** (geen extra prefix zoals de oude "Kun je lesgeven op: [...]"
+  wrapper). Dat kon omdat `addMultipleChoiceItem()` per les een eigen vraag gebruikt in
+  plaats van een grid-vraag (wat het oude, met de hand gemaakte formulier gebruikte) --
+  Google Forms exporteert dan de kolomkop als exact de vraagtitel, wat het parsen in
+  `forms_import.py` sterk vereenvoudigt (regex op '#(\d+)$' volstaat) t.o.v. de oude
+  grid-gebaseerde aanpak.
+- **De naamkolom-dropdown (`addListItem` met vaste keuzes)** betekent dat bij een via het
+  script gemaakt formulier de naam ALTIJD exact matcht -- de fuzzy-wizard verschijnt dan
+  nooit. `domain/names.py` en de resolutiedialoog zijn dus alleen relevant voor handgemaakte
+  formulieren of getypte varianten; getest via `test_dropdown_naam_is_altijd_exact`.
+- **Terugval-labelparsing (`_koppel_op_label`)** herkent dag+maand(+tijd) via een regex en
+  koppelt op (dag, maand, evt. tijd) tegen `project.lessen` -- NOOIT op een afgeleid
+  jaartal. Bij 0 of >1 kandidaten wordt de kolom gemeld als niet-gekoppeld in plaats van
+  geraden; dat is een bewuste "liever niets doen dan fout koppelen"-keuze, consistent met
+  conventie 5.
+- **`ImportResultaat`/`NaamProbleem` (exchange/types.py) dragen `waarden`/`ingevuld_op` mee
+  op het naamprobleem zelf**, niet alleen op het uiteindelijke antwoord. DESIGN.md's
+  schets van `NaamProbleem` liet dit open; zonder deze velden zou een net-opgelost
+  naamprobleem geen antwoord kunnen opleveren (de ruwe rijdata zou al weg zijn tegen de
+  tijd dat de gebruiker een lesgever kiest in de wizard).
+- **`state.meld_wijziging()` als brede "er is iets veranderd"-brug** tussen de linkerrail
+  (lesgevers/rondes, mutaties via directe functie-aanroepen, geen doc-brede callback) en
+  header/inspector/planning. Iets grover dan een gerichte refresh (het herbouwt ook het
+  middenpaneel bij het toevoegen van één lesgever), maar simpel en correct; de kosten zijn
+  verwaarloosbaar omdat lesgevers/rondes beheren geen high-frequency actie is (in
+  tegenstelling tot bv. lesgever-toewijzen in de planning, waar wel gerichte per-rij
+  refresh nodig was). `_ververs_na_wijziging()` in app.py is nu de ene plek die alles
+  (header, inspector, linkerrail) samen ververst en wordt door undo/redo, de solver, en
+  `state.on_change` allemaal gebruikt.
+- **Responsoverzicht toont alleen "nog te vullen"**, geen volledige beschikbaarheidsmatrix
+  (die komt terug als de "Toon beschikbaarheid"-schakelaar op de planning, nog niet
+  gebouwd -- zie openstaande punt hieronder).
+
+- **"Toon beschikbaarheid" is uitgevoerd als groepering + kleur, niet als aparte kolommen
+  per lesgever.** PLAN.md fase 6 taak 7 vroeg om "een schakelaar die kolommen per lesgever
+  toevoegt aan de planning-rijen" -- een volledige matrix-weergave zoals de oude
+  datumprikker_view.py. Dat vereist een fundamenteel andere rij-layout (breed, horizontaal
+  scrollend) die niet past bij de huidige compacte lijst-weergave, en zou een aparte
+  deelweergave zijn geworden in plaats van een simpele knop. In plaats daarvan:
+  (a) het lesgever-toewijsmenu groepeert nu op Ja/Misschien/Onbekend/Nee met kopregels,
+  (b) een toegewezen 'misschien'-lesgever kleurt de slotknop geel (`#fff3cd`, dezelfde kleur
+  als de oude AG Grid-cel), zichtbaar zonder het menu te openen, en (c) de inspector
+  (fase 5, "les geselecteerd") toont al de volledige beschikbaarheid van iedereen voor een
+  les. Dat dekt het echte doel (beschikbaarheid meenemen bij het toewijzen, zonder een
+  apart rapport te hoeven raadplegen) zonder een grote nieuwe matrix-component te bouwen.
+  Een volledige matrix-overzicht kan alsnog later als aparte deelweergave, mocht dat nodig
+  blijken.

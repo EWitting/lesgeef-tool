@@ -1,10 +1,10 @@
 """NiceGUI-app: startscherm of de drie-zone-lay-out (docs/DESIGN.md §2.6).
 
 header: projectnaam + opgeslagen-indicator, undo/redo, sluiten.
-links:  inklapbare rail -- krijgt in latere fases Jaarplanning/Lesgevers/Beschikbaarheid/
-        Config (fase 3, 6, 8). Nu een plek-houder zodat de lay-out al klopt.
+links:  inklapbare rail met Lesgevers en Beschikbaarheid (rondes). Jaarplanning en Config
+        volgen in fase 8/9.
 midden: de planning, ALTIJD zichtbaar (dit is het hart van de app).
-rechts: inspector -- gezondheid/les/persoon (fase 5). Nu leeg."""
+rechts: inspector -- gezondheid/les/persoon (fase 5)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +14,8 @@ from platformdirs import user_documents_dir
 
 from ..domain.formatting import format_datum_lang
 from .bestandsdialoog import kies_bestand_opslaan, native_beschikbaar
+from .dialogen.lesgevers import create_lesgevers_paneel
+from .dialogen.rondes import create_rondes_paneel
 from .inspector import Inspector
 from .planning_view import PlanningView
 from .startscherm import create_startscherm
@@ -94,8 +96,16 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             f"width: {_LINKS_PANEEL_BREEDTE}; min-width: 220px; height: calc(100vh - 56px); "
             "overflow-y: auto; border-right: 1px solid #e0e0e0; padding: 8px; margin: 0;"
         ) as links_paneel:
-            ui.label("Binnenkort hier: Jaarplanning, Lesgevers, Beschikbaarheid, Config.").classes(
-                "text-caption text-grey-6"
+            with ui.tabs().props("dense no-caps").classes("full-width") as links_tabs:
+                lesgevers_tab = ui.tab("Lesgevers")
+                rondes_tab = ui.tab("Beschikbaarheid")
+            with ui.tab_panels(links_tabs, value=lesgevers_tab).classes("full-width"):
+                with ui.tab_panel(lesgevers_tab) as lesgevers_paneel:
+                    create_lesgevers_paneel(lesgevers_paneel)
+                with ui.tab_panel(rondes_tab) as rondes_paneel:
+                    create_rondes_paneel(rondes_paneel)
+            ui.label("Jaarplanning en instellingen volgen in een latere fase.").classes(
+                "text-caption text-grey-6 q-mt-md"
             )
 
         with ui.column().style(
@@ -134,11 +144,14 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         )
 
     def _ververs_na_wijziging() -> None:
-        """Ververst zowel de header (opgeslagen-indicator, undo/redo) als het
-        inspectiepaneel (bevindingen, issue-stippen) -- na ELKE wijziging aan het project,
-        ongeacht of die via het middenpaneel, undo/redo, of de solver kwam."""
+        """Ververst header (opgeslagen-indicator, undo/redo), inspectiepaneel (bevindingen,
+        issue-stippen) en de linkerrail (lesgevers/rondes kunnen bv. bij undo weer een
+        andere stand hebben) -- na ELKE wijziging aan het project, ongeacht of die via het
+        middenpaneel, de linkerrail, undo/redo, of de solver kwam."""
         ververs_header()
         inspector.render()
+        create_lesgevers_paneel(lesgevers_paneel)
+        create_rondes_paneel(rondes_paneel)
 
     def _ongedaan_maken() -> None:
         assert state.doc is not None

@@ -13,6 +13,7 @@ from typing import Callable
 from nicegui import ui
 
 from ..domain.analysis import Bevinding
+from ..domain.beschikbaarheid import verzamel_beschikbaarheid
 from ..domain.formatting import format_datum, format_datum_lang, format_tijd, format_tijdvak
 from ..model.entities import Les, les_seizoen_id
 from ..model.project import Project
@@ -28,6 +29,7 @@ _ONEVEN_WEEK_KLEUR = "#f0f0f0"
 _PIN = "\U0001F4CC"
 
 _ERNST_RANG = {"fout": 3, "waarschuwing": 2, "info": 1}
+_BESCHIKBAARHEID_KOP = {"ja": "Ja", "misschien": "Misschien", "onbekend": "Onbekend", "nee": "Nee"}
 _ERNST_KLEUR = {"fout": "text-red-8", "waarschuwing": "text-orange-6", "info": "text-blue-6"}
 
 
@@ -139,14 +141,19 @@ class LessonRow:
         knop = self.slot_knoppen[i]
         menu = self.slot_menus[i]
         namen = {lg.id: lg.naam for lg in project.lesgevers}
+        beschikbaarheid = verzamel_beschikbaarheid(project)
 
         bezet = i < len(les.toewijzingen)
+        basis_stijl = "width: 130px; justify-content: flex-start;"
         if bezet:
             tw = les.toewijzingen[i]
             naam = namen.get(tw.lesgever_id, "? (onbekend)")
             knop.set_text(f"{_PIN} {naam}" if tw.vast else naam)
+            if beschikbaarheid.get((tw.lesgever_id, les.id)) == "misschien":
+                basis_stijl += " background: #fff3cd;"
         else:
             knop.set_text("—")
+        knop.style(replace=basis_stijl)
 
         menu.clear()
         with menu:
@@ -155,12 +162,26 @@ class LessonRow:
             )
             if not actieve_lesgevers:
                 ui.menu_item("Geen actieve lesgevers").props("disable")
+
+            per_categorie: dict[str, list] = {"ja": [], "misschien": [], "onbekend": [], "nee": []}
             for lg in actieve_lesgevers:
-                aantal = lb.aantal_lessen_voor(project, lg.id)
-                ui.menu_item(
-                    f"{lg.naam} ({aantal} {'les' if aantal == 1 else 'lessen'})",
-                    on_click=lambda lg_id=lg.id: self._klik_toewijzen(i, lg_id),
-                )
+                waarde = beschikbaarheid.get((lg.id, les.id)) or "onbekend"
+                per_categorie[waarde].append(lg)
+
+            for categorie in ("ja", "misschien", "onbekend", "nee"):
+                groep = per_categorie[categorie]
+                if not groep:
+                    continue
+                if len(actieve_lesgevers) > len(groep):  # kopregel alleen als er >1 groep is
+                    ui.menu_item(_BESCHIKBAARHEID_KOP[categorie]).props("disable").classes(
+                        "text-caption text-weight-bold"
+                    )
+                for lg in groep:
+                    aantal = lb.aantal_lessen_voor(project, lg.id)
+                    ui.menu_item(
+                        f"{lg.naam} ({aantal} {'les' if aantal == 1 else 'lessen'})",
+                        on_click=lambda lg_id=lg.id: self._klik_toewijzen(i, lg_id),
+                    )
             if bezet:
                 ui.separator()
                 tw = les.toewijzingen[i]
