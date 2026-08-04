@@ -455,3 +455,50 @@ eerdere keuze kan een latere fase raken.
   gepakte, echt draaiende app in dit environment visueel vast te leggen. De tekst is wel
   volledig herschreven en YAML-vrij; screenshots toevoegen is een losse, kleine vervolgstap
   zodra iemand de app echt op een Windows-machine kan draaien.
+
+## 2026-08-04 — Fase 10
+
+- **Build daadwerkelijk uitgevoerd en getest op deze ontwikkelmachine** (Windows), niet
+  alleen opgeschreven: `uv run pyinstaller ... packaging/bootstrap.py` bouwt een werkende
+  `Lesgeefplanner.exe` (~88-91 MB, vooral OR-Tools), die een native venster getiteld
+  "Lesgeefplanner" opent zonder consolevenster en zonder fouten in
+  `%LOCALAPPDATA%/Lesgeefplanner/log.txt`. Dit is GEEN vervanging voor "test op een echt
+  schone Windows-machine zonder Python/uv" (PLAN.md's acceptatiecriterium) -- deze machine
+  heeft uv/Python al -- maar het bevestigt wel dat de PyInstaller-configuratie zelf werkt,
+  wat het grootste risico bij dit soort bundeling is (ontbrekende native libs/data-files).
+- **`packaging/bootstrap.py` als apart startpunt** i.p.v. PyInstaller direct op
+  `src/lesgeefplanner/__main__.py` loslaten. Dat bestand doet zelf een
+  `sys.path.insert(...)` voor het geval het als los script gestart wordt (`python
+  __main__.py`) -- in de PyInstaller-bundel is `lesgeefplanner` al gewoon importeerbaar
+  (het zit als geïnstalleerd package in de omgeving die geanalyseerd wordt) en zou die
+  aanpassing overbodig zijn tot verwarrend kunnen worden. Een dun bootstrap-bestand dat
+  alleen `from lesgeefplanner.__main__ import main; main()` doet, voorkomt die vraag
+  volledig.
+- **`nicegui-pack` (NiceGUI's eigen CLI-wrapper om PyInstaller) NIET gebruikt**, ondanks dat
+  die bestaat en precies hiervoor bedoeld is. Gecontroleerd (`nicegui/scripts/pack.py`
+  gelezen): hij voegt alleen `--add-data` toe voor nicegui's eigen statische bestanden, niet
+  voor OR-Tools. Rechtstreeks `pyinstaller --collect-all nicegui --collect-all ortools`
+  aanroepen (zoals PLAN.md al voorstelde) dekt dus meer in één stap en is exact wat
+  uiteindelijk werkte; `nicegui-pack` zou nog steeds een handmatige OR-Tools-toevoeging
+  nodig hebben gehad.
+- **Geen custom `.ico`-bestand meegegeven.** Er was geen ontwerpasset beschikbaar in deze
+  sessie; de exe gebruikt PyInstaller's standaardicoon. Een eigen icoon toevoegen is een
+  kleine, geïsoleerde vervolgstap (`--icon pad/naar/icoon.ico` aan het spec-commando).
+- **`IMPLEMENTATION_NOTES.md` en `TODO.md` ook verwijderd**, hoewel PLAN.md alleen `src/`
+  (oud), `ui/` (oud) en `main.py` noemt. Beide bestanden documenteerden uitsluitend de OUDE
+  implementatie (bv. `IMPLEMENTATION_NOTES.md` legt `schedule_lessons()`'s
+  pre-assignment-logica uit zoals die in het verwijderde `src/schedule.py` stond); ze laten
+  staan zou verwarrend zijn omdat ze naar niet meer bestaande code verwijzen. `data/`
+  (de echte planning.yml/roosterconfig.yaml van de commissie) is bewust NIET aangeraakt --
+  dat is data, geen implementatie, en valt buiten wat deze fase moest opruimen.
+- **GitHub Actions-workflow bouwt op elke `v*`-tag en draait een rooktest** (de exe moet
+  minstens 8 seconden blijven draaien zonder af te sluiten) voordat hij aan de Release
+  hangt -- een build die crasht bij het opstarten faalt daarmee de workflow in plaats van
+  stilzwijgend een kapotte exe te publiceren. Niet expliciet gevraagd in PLAN.md, maar een
+  goedkope, waardevolle toevoeging gezien hoe makkelijk een PyInstaller-bundel een
+  ontbrekende runtime-dependency kan missen.
+- **Geen live GitHub Release aangemaakt.** Het publiceren van een release/tag is een
+  zichtbare, moeilijk terug te draaien actie (triggert de workflow, publiceert een
+  publiek zichtbaar bestand) en hoort bij de bevoegdheid van de gebruiker, niet bij
+  autonome uitvoering. De workflow staat klaar; `git tag v... && git push origin v...`
+  zet hem in gang zodra de gebruiker dat wil.

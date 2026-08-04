@@ -1,0 +1,60 @@
+name: Release
+
+# Bouwt Lesgeefplanner.exe op Windows en hangt hem aan een GitHub Release, zodra een tag
+# als v1.0.0 gepusht wordt. Zie docs/ONTWIKKELAAR.md voor hoe je zo'n tag maakt.
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installeer uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Installeer dependencies (incl. pyinstaller)
+        run: uv sync --group dev
+
+      - name: Bouw Lesgeefplanner.exe
+        run: >
+          uv run pyinstaller --noconfirm --clean
+          --name Lesgeefplanner --onefile --windowed
+          --collect-all nicegui --collect-all ortools
+          --distpath packaging/dist --workpath packaging/build --specpath packaging
+          packaging/bootstrap.py
+
+      - name: Rooktest -- opstarten zonder crash
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath "packaging/dist/Lesgeefplanner.exe" -PassThru
+          Start-Sleep -Seconds 8
+          if ($proc.HasExited) {
+            Write-Error "Lesgeefplanner.exe is meteen afgesloten (exit code $($proc.ExitCode))."
+            exit 1
+          }
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Upload build-artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lesgeefplanner-windows
+          path: packaging/dist/Lesgeefplanner.exe
+
+      - name: Maak GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packaging/dist/Lesgeefplanner.exe
+          generate_release_notes: true
+          body: |
+            ## Installeren
+            1. Download `Lesgeefplanner.exe` hieronder.
+            2. Dubbelklik om te starten. Er hoeft niets anders geïnstalleerd te worden.
+            3. Windows toont mogelijk "Windows heeft de computer beschermd" (SmartScreen) --
+               dit gebeurt bij elk nieuw, niet-ondertekend programma. Klik op
+               **"Meer info"** en daarna op **"Toch uitvoeren"**.
