@@ -10,6 +10,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write  # nodig om een Release aan te maken en release-notes te genereren
     steps:
       - uses: actions/checkout@v4
 
