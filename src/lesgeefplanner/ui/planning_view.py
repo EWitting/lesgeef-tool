@@ -17,9 +17,11 @@ from ..domain.beschikbaarheid import verzamel_beschikbaarheid
 from ..domain.formatting import format_datum, format_datum_lang, format_tijd, format_tijdvak
 from ..model.entities import Les, les_seizoen_id
 from ..model.project import Project
+from ..model.scope import Scope
 from ..planner import bouw_request, los_op
 from . import lesbewerkingen as lb
 from .dialogen.diff_dialoog import DiffRegel, toon_diff_dialoog
+from .dialogen.scope_balk import create_scope_balk
 from .state import state
 
 _WEEK_GRENS_STIJL = "border-top: 2px solid #7a9cc4;"
@@ -27,6 +29,10 @@ _GEEN_WEEK_GRENS_STIJL = "border-top: 1px solid transparent;"
 _EVEN_WEEK_KLEUR = "#dce6f1"
 _ONEVEN_WEEK_KLEUR = "#f0f0f0"
 _PIN = "\U0001F4CC"
+# Band die aangeeft of een les binnen de huidige Scope valt (docs/DESIGN.md §2.4) --
+# zodat nooit onduidelijk is wat "Automatisch invullen"/een nieuwe ronde gaat raken.
+_SCOPE_RAND_AAN = "border-left: 4px solid #3182ce;"
+_SCOPE_RAND_UIT = "border-left: 4px solid transparent;"
 
 _ERNST_RANG = {"fout": 3, "waarschuwing": 2, "info": 1}
 _BESCHIKBAARHEID_KOP = {"ja": "Ja", "misschien": "Misschien", "onbekend": "Onbekend", "nee": "Nee"}
@@ -45,15 +51,20 @@ class LessonRow:
         nieuwe_week: bool,
         on_wijziging: Callable[[str], None],
         on_selecteer: Callable[[str], None],
+        scope: Scope,
+        peildatum: date,
     ) -> None:
         self._on_wijziging = on_wijziging
         self._on_selecteer = on_selecteer
         self._les_id = les.id
+        # Vast per rij (verandert niet na constructie), dus apart bewaard i.p.v. steeds
+        # opnieuw af te leiden -- ververs() moet 'm elke keer META de andere stijlen
+        # meesturen, want .style(replace=...) vervangt de VOLLEDIGE inline stijl.
+        self._week_grens_stijl = _WEEK_GRENS_STIJL if nieuwe_week else _GEEN_WEEK_GRENS_STIJL
 
         with container:
             with ui.row().classes("items-center q-px-sm").style(
-                "flex-wrap: nowrap; min-height: 32px;"
-                + (_WEEK_GRENS_STIJL if nieuwe_week else _GEEN_WEEK_GRENS_STIJL)
+                "flex-wrap: nowrap; min-height: 32px;" + self._week_grens_stijl
             ) as self.root:
                 with ui.row().classes("items-center cursor-pointer").style(
                     "flex-wrap: nowrap; gap: 4px;"
@@ -78,17 +89,23 @@ class LessonRow:
                 with self.acties_btn:
                     self.acties_menu = ui.menu()
 
-        self.ververs(les, project)
+        self.ververs(les, project, scope, peildatum)
         self.zet_bevindingen([])
 
     # ------------------------------------------------------------------
 
-    def ververs(self, les: Les, project: Project) -> None:
+    def ververs(self, les: Les, project: Project, scope: Scope, peildatum: date) -> None:
         self._les_id = les.id
         even_week = les.datum.isocalendar()[1] % 2 == 0
         achtergrond = _EVEN_WEEK_KLEUR if even_week else _ONEVEN_WEEK_KLEUR
         vervallen = les.status == "vervallen"
-        self.root.style(replace=f"background: {achtergrond}; flex-wrap: nowrap; min-height: 32px;")
+        scope_rand = _SCOPE_RAND_AAN if scope.bevat(les, peildatum) else _SCOPE_RAND_UIT
+        self.root.style(
+            replace=(
+                f"background: {achtergrond}; flex-wrap: nowrap; min-height: 32px; "
+                f"{self._week_grens_stijl} {scope_rand}"
+            )
+        )
         self.root.classes(
             add="text-grey text-italic" if vervallen else "", remove="" if vervallen else "text-grey text-italic"
         )
@@ -316,6 +333,8 @@ class PlanningView:
         self._rows.clear()
 
         with self._container:
+            scope_balk_rij = ui.row().classes("q-gutter-sm q-mb-xs items-center")
+            create_scope_balk(scope_balk_rij)
             with ui.row().classes("q-gutter-sm q-mb-xs items-center"):
                 ui.button(
                     "+ Extra les toevoegen", icon="add", on_click=self._klik_extra_les_toevoegen
@@ -365,6 +384,7 @@ class PlanningView:
                 rij = LessonRow(
                     self._container, les, project, nieuwe_week,
                     self._na_wijziging, self._on_selecteer_les,
+                    state.scope, state.peildatum(),
                 )
                 self._rows[les.id] = rij
 
@@ -380,7 +400,7 @@ class PlanningView:
         if les is None:
             self.rebuild()
             return
-        rij.ververs(les, project)
+        rij.ververs(les, project, state.scope, state.peildatum())
 
     def refresh_lessen(self, les_ids) -> None:
         for les_id in les_ids:

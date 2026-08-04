@@ -30,6 +30,17 @@ class AppState:
         assert self.doc is not None
         return self.doc.project.werkblad.laatste_scope
 
+    def stel_scope_in(self, scope: Scope) -> None:
+        """De ENE scope die 'Automatisch invullen', het aanmaken van een beschikbaarheids-
+        ronde, en het gezondheidspaneel allemaal gebruiken (docs/DESIGN.md §2.4) -- via
+        doc.muteer() zoals alle projectwijzigingen, ook al is dit meer een 'waar kijk ik
+        naar'-instelling dan een roosterwijziging. Bewuste keuze voor één mutatiepad in
+        plaats van een aparte, niet-undo-bare route."""
+        assert self.doc is not None
+        with self.doc.muteer("Scope aangepast"):
+            self.doc.project.werkblad.laatste_scope = scope
+        self._meld_wijziging()
+
     def peildatum(self) -> date:
         if self.doc is not None and self.doc.project.werkblad.peildatum_override is not None:
             return self.doc.project.werkblad.peildatum_override

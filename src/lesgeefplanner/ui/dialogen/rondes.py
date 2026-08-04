@@ -43,31 +43,41 @@ def _nieuwe_ronde_sectie(container: ui.column) -> None:
     with ui.card().classes("q-pa-sm full-width"):
         ui.label("Nieuwe ronde").classes("text-caption text-weight-bold")
         naam_veld = ui.input("Naam (bv. 'Voorseizoen 1')").classes("full-width")
-        seizoen_opties = {s.id: s.naam for s in project.seizoenen}
-        seizoen_select = ui.select(
-            seizoen_opties, label="Seizoenen (leeg = alle)", multiple=True
-        ).classes("full-width").props("use-chips")
-        alleen_toekomst = ui.checkbox("Alleen toekomstige lessen", value=True)
+        ui.label(f"Scope: {_scope_omschrijving(state.scope, project)}").classes(
+            "text-caption text-grey-7"
+        )
+        ui.label(
+            "Verander de scope via de balk boven de planning (middenpaneel) -- dezelfde "
+            "scope bepaalt ook wat 'Automatisch invullen' en het gezondheidspaneel raken "
+            "(docs/DESIGN.md §2.4)."
+        ).classes("text-caption text-grey-6")
         ui.button(
             "Ronde aanmaken",
-            on_click=lambda: _klik_ronde_aanmaken(
-                container, naam_veld, seizoen_select, alleen_toekomst
-            ),
+            on_click=lambda: _klik_ronde_aanmaken(container, naam_veld),
         ).props("color=primary dense")
 
 
-def _klik_ronde_aanmaken(container, naam_veld, seizoen_select, alleen_toekomst) -> None:
+def _scope_omschrijving(scope: Scope, project) -> str:
+    if scope.seizoen_ids:
+        seizoen_naam = {s.id: s.naam for s in project.seizoenen}
+        namen = ", ".join(seizoen_naam.get(sid, "?") for sid in scope.seizoen_ids)
+    else:
+        namen = "alle seizoenen"
+    toekomst = "alleen toekomstige lessen" if scope.alleen_toekomst else "inclusief verleden"
+    return f"{namen} ({toekomst})"
+
+
+def _klik_ronde_aanmaken(container: ui.column, naam_veld: ui.input) -> None:
     naam = naam_veld.value.strip() if naam_veld.value else ""
     if not naam:
         ui.notify("Geef de ronde een naam.", type="warning")
         return
-    gekozen_seizoenen = seizoen_select.value or None
-    scope = Scope(seizoen_ids=gekozen_seizoenen, alleen_toekomst=alleen_toekomst.value)
-    ronde_id = rb.maak_ronde(naam, scope, state.peildatum())
+    ronde_id = rb.maak_ronde(naam, state.scope, state.peildatum())
     ronde = _vind_ronde(ronde_id)
     if ronde is not None and not ronde.vragen:
         ui.notify(
-            "Deze ronde heeft geen enkele les geraakt -- controleer de scope.",
+            "Deze ronde heeft geen enkele les geraakt -- controleer de scope-balk boven "
+            "de planning.",
             type="warning",
         )
     else:
