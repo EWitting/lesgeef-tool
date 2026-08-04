@@ -23,3 +23,30 @@ eerdere keuze kan een latere fase raken.
 - **`ui/app.py` is nu een placeholder** (alleen een label) — wordt in fase 2 vervangen door de
   volledige drie-zone-lay-out uit DESIGN.md §2.6. Dit is bewust: fase 0 moet alleen aantonen
   dat de server opstart.
+
+## 2026-08-04 — Fase 1
+
+- **`nieuw_id()` verplaatst naar `model/ids.py`** in plaats van in `model/__init__.py` zoals
+  DESIGN.md §7 impliceert, om een circulaire import te vermijden (`entities.py` heeft
+  `nieuw_id` nodig als `default_factory`, en `__init__.py` importeert op zijn beurt uit
+  `entities.py`). `model/__init__.py` re-exporteert `nieuw_id` alsnog, dus de publieke API
+  (`from lesgeefplanner.model import nieuw_id`) is ongewijzigd.
+- **`muteer()` maakt de snapshot van vóór het blok, niet erna** — dat stond al zo in
+  DESIGN.md, hier expliciet bevestigd met een test (`test_undo_herstelt_exact`) omdat dit de
+  meest voor de hand liggende plek is om per ongeluk de verkeerde volgorde te kiezen.
+  Belangrijke nuance die niet in DESIGN.md stond: als de code binnen het `with doc.muteer():`
+  blok een exception gooit, is de snapshot-van-ervoor nog niet op de stack gezet (de `yield`
+  gebeurt vóór de `append`), dus een mislukte mutatie is niet undo-baar maar het project zelf
+  kan al gedeeltelijk gewijzigd zijn als de aanroeper het blok niet atomisch houdt. Aanroepers
+  moeten dus zelf zorgen dat het blok geen halve wijziging achterlaat bij een fout (bv. eerst
+  alle validatie doen, dan pas muteren).
+- **Backupbestanden komen naast het projectbestand** in `<projectmap>/.lesgeefplanner-backups/`
+  in plaats van een centrale map, zodat een backup meeverhuist als het project verplaatst
+  wordt en niet aangroeit tot een ongelimiteerde map met alle ooit geopende projecten door
+  elkaar. Bewaart de laatste 10 per bestandsnaam (`<stem>-<tijdstempel><suffix>`).
+- **`autosave_indien_nodig()` is een expliciete, UI-aan te roepen methode**, geen achtergrondthread.
+  De `Document`-klasse blijft daardoor UI-onafhankelijk en testbaar zonder event-loop; fase 2
+  koppelt er een `ui.timer` aan die deze elke paar seconden aanroept.
+- **`os.fsync()` toegevoegd** aan het atomisch schrijven (niet expliciet genoemd in
+  DESIGN.md) — zonder fsync kan een crash vlak na `os.replace()` op sommige
+  bestandssystemen nog steeds oude data opleveren omdat de OS-buffer niet is doorgespoeld.
