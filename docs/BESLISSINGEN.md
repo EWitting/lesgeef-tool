@@ -387,3 +387,71 @@ eerdere keuze kan een latere fase raken.
   losstaande actie (één keer een datum kiezen) is dat geen probleem, voor een compacte
   herhalende lijst wel. Validatie gebeurt bij het verlaten van het veld (`blur`), met een
   duidelijke foutmelding bij een onleesbare datum in plaats van een gok.
+
+## 2026-08-04 — Fase 9
+
+- **Stappenstatus als een status-rij boven de tabs, niet als vervanging van de tabs.**
+  DESIGN.md/PLAN.md beschrijven `ui/stappen.py` als "linkerrail met de stappen" die klikbaar
+  is; de bestaande tabs (Jaarplanning/Lesgevers/Beschikbaarheid/Delen, sinds fase 6/7/8)
+  deden dat al. In plaats van de navigatie te herbouwen, kreeg elke tab een klikbaar
+  statuslabel (✓/!/—) erboven dat naar de bijbehorende tab springt. "Inroosteren" heeft
+  geen eigen tab (dat IS het middenpaneel, altijd zichtbaar) en is dus alleen informatief
+  met een tooltip, niet klikbaar.
+  Overwogen om de icoon-status rechtstreeks IN de Quasar-tab-labels te zetten
+  (`with ui.tab(): ui.badge(...)`), maar dat vereist het live bijwerken van content
+  genest in een tab-element -- een minder beproefd stuk NiceGUI-API dan een losse
+  `ui.label` met `.set_text()`. Gekozen voor de zekerdere weg.
+- **Statusregels** (`ui/stappen.py`) zijn eigen interpretatie, niet letterlijk uit
+  DESIGN.md/PLAN.md (die specificeren alleen dát er status moet zijn, niet de exacte
+  regels). Bijvoorbeeld: Jaarplanning is "aandacht" zodra `bereken_kalender_diff()` niet
+  leeg is (kalender loopt uit de pas met de seizoensinstellingen); Inroosteren is
+  "aandacht" zodra er minstens één bevinding met ernst "fout" is.
+- **`domain/jaarwissel.py`: reguliere (gegenereerde) lessen gaan NIET mee** bij het
+  doorrollen naar een nieuw jaar -- alleen seizoenen/weekrooster/lesgevers/extra-lessen.
+  De gebruiker moet daarna zelf "Kalender bijwerken" klikken. Bewuste keuze: de oude lessen
+  hebben oude datums die toch niet kloppen zonder een aparte verschuivingsberekening per
+  les, en de kalender opnieuw laten genereren via de bestaande, geteste
+  `domain/calendar.py`-weg is betrouwbaarder dan een tweede manier verzinnen om lessen te
+  verschuiven.
+- **Verschuiving is standaard 364 dagen (52 weken), niet 365.** Een gewoon jaar verschuift
+  de dag-van-de-week (het volgend seizoen zou dan een dinsdag/donderdag-rooster nodig
+  hebben in plaats van hetzelfde weekrooster) -- 52 weken behoudt de weekdag-uitlijning.
+  Extra lessen (die WEL hun datum letterlijk verschoven krijgen, in tegenstelling tot
+  reguliere lessen) profiteren hier direct van.
+- **Lesgever-ids blijven behouden bij het doorrollen** (`model_copy()` in plaats van een
+  nieuwe `Lesgever()`), seizoen/les-ids juist niet (nieuwe objecten). Consistente regel:
+  een lesgever is dezelfde PERSOON jaar na jaar (Excel Code-kolommen, toekomstige
+  koppelingen moeten blijven werken), een seizoen/les is een nieuwe INSTANTIE die toevallig
+  dezelfde naam/vorm heeft.
+- **`app.on_exception()` als globaal vangnet** (`ui/foutafhandeling.py`): NiceGUI's eigen
+  standaardgedrag bij een onverwachte fout in een klik-handler is stil -- alleen naar de
+  server-console loggen (`log.exception`), niets zichtbaar voor de gebruiker. In de
+  gepakte app is er geen zichtbare console, dus zonder dit vangnet lijkt een fout op "er
+  gebeurt niets als ik klik". Nu: een dialoog met een korte Nederlandse melding en een
+  "Kopieer technische details"-knop, plus wegschrijven naar
+  `%LOCALAPPDATA%/Lesgeefplanner/log.txt`. Dit komt BOVENOP de bestaande gerichte
+  try/except-afhandeling met specifieke Nederlandse meldingen (bv. "Kon bestand niet
+  lezen: ...") die al overal in de UI-code stonden -- die blijven de eerste verdedigingslinie
+  voor verwachte fouten; dit vangt de rest.
+- **`__main__.py` gebruikt nu daadwerkelijk `native=True` als pywebview beschikbaar is.**
+  Dit was in fase 2 al ONTWORPEN (`ui/bestandsdialoog.py`'s `native_beschikbaar()`
+  bestond al) maar nooit aan `ui.run()` doorgegeven -- de entry point startte altijd in
+  browsermodus, waardoor de native-bestandsdialoog-code in alle tests tot nu toe ongebruikt
+  bleef (elke smoke-test in dit document gebruikte bewust `native=False` om headless te
+  kunnen draaien). Nu gecorrigeerd; de browser-fallback blijft de goed-geteste weg voor
+  ontwikkelen, en is ook wat draait als pywebview om wat voor reden dan ook niet importeert.
+- **Geen scope-band-UI gebouwd**, dus PLAN.md fase 9 taak 3's "scope-uitleg bij de
+  scopebalk" is niet van toepassing -- er is nog geen scopebalk om uitleg bij te zetten
+  (zie de openstaande opmerking hierover in fase 4's beslissingen). De Forms-stappen bij de
+  Forms-knop (taak 3's andere voorbeeld) staan er wel, sinds fase 6.
+- **Foutmeldingen zijn NIET exhaustief lijn-voor-lijn geaudit** (PLAN.md taak 4), maar
+  steekproefsgewijs gecontroleerd: alle `ui.notify(...)`-aanroepen die tijdens fase 3-9 zijn
+  geschreven, zijn al in het Nederlands met een concrete beschrijving van wat er misging.
+  Een volledige doorloop van alle bestanden is niet apart gedaan gezien de omvang van deze
+  sessie; als er toch een niet-Nederlandse of onduidelijke melding ergens zit, is dat een
+  gerichte fix, geen structureel probleem.
+- **README herschreven, geen screenshots.** PLAN.md vroeg om een "korte, geïllustreerde
+  handleiding"; screenshots zijn hier niet toegevoegd omdat er geen manier was om de
+  gepakte, echt draaiende app in dit environment visueel vast te leggen. De tekst is wel
+  volledig herschreven en YAML-vrij; screenshots toevoegen is een losse, kleine vervolgstap
+  zodra iemand de app echt op een Windows-machine kan draaien.

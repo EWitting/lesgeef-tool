@@ -1,56 +1,69 @@
-# Jaarplanning maken
+# Lesgeefplanner
 
-* Maak een **planning.yml** bestand aan zoals hier onder. 
-* **Seizoenen** zijn de periodes waarin de lessen plaatsvinden. Vooral handig om rooster datumprikker periodes uit elkaar te houden en winterstop e.d. te bepalen.
-* **Weekrooster** is het standaard rooster waarin de lessen plaatsvinden. Dit wordt voor elk seizoen gebruikt, tenzij het seizoen zelf een `weekrooster` heeft.
-* **Extra-lessen** zijn lessen die niet uit het normale rooster komen, zoals X-lessen, PKursus, open lessen etc.
-* **Activiteiten** zijn alleen relevant als ze overlappen met een les. Ze kunnen ofwel de automatisch gegenereerde lessen zichtbaar aflassen met een reden (`les-gaat-door: false`), of gebruikt worden om de naam en eventueel tijd aan te passen (`les-gaat-door: true` en optioneel `tijd`). Ze hebben geen effect op *extra-lessen*.
-```yaml
-seizoenen:
-  - naam: "Naseizoen 1"
-    begin: "2025-09-01"
-    eind: "2025-09-28"
-  - naam: "Naseizoen 2"
-    begin: "2025-10-01"
-    eind: "2025-11-16"
-  ...
+Een tool voor het maken en beheren van de lesgeefplanning van een zeilcommissie (of
+vergelijkbare vrijwilligersclub): seizoenen en een weekrooster instellen, beschikbaarheid
+ophalen via Google Forms, automatisch een rooster laten voorstellen, en het resultaat delen
+via Excel/Google Drive.
 
-weekrooster:
-  - dag: "woensdag"
-    tijd: "17:00 - 20:00"
-  - dag: "zaterdag"
-    tijd: "14:00 - 17:00"
-  - dag: "zondag"
-    tijd: "14:00 - 17:00"
+## Snel starten
 
-extra-lessen:
-  - naam: "Open Les"
-    dagen:
-      - datum: "2025-09-21"
-        tijd: "10:00 - 13:00"
-      - datum: "2025-09-28"
-        tijd: "10:00 - 13:00"
-    ...
+1. **Installeer** de app: download de nieuwste `.exe` van de
+   [Releases-pagina](../../releases) en dubbelklik hem. Er hoeft niets anders geïnstalleerd
+   te worden. (Windows kan bij de eerste keer een waarschuwing tonen omdat het programma
+   niet digitaal ondertekend is -- kies "Meer info" → "Toch uitvoeren".)
+2. De app opent in een eigen venster. Kies **Nieuw project**, of **Nieuw jaar op basis van
+   vorig bestand** als je het bestand van vorig jaar hebt.
+3. Volg de stappen in het linkerpaneel: **Jaarplanning → Lesgevers → Beschikbaarheid →
+   Inroosteren → Delen**. Elke stap heeft ✓ (klaar), ! (nog aandacht nodig) of — (nog niet
+   begonnen) ervoor, zodat je in één oogopslag ziet wat er nog moet gebeuren.
 
-activiteiten:
-  - naam: "Robbie Games"
-    datum: "2025-09-20"
-    les-gaat-door: false
-  - naam: "Lustrum Activiteit"
-    datum: "2025-08-05"
-    les-gaat-door: false
-   ...
+Uitleg bij elke actie staat direct bij de knop in de app zelf (bijvoorbeeld de stappen om
+een Google Form aan te maken staan naast de knop "Formulier maken" onder
+Beschikbaarheid) -- dit README is dus bewust kort.
+
+## Wat de stappen doen
+
+- **Jaarplanning** -- seizoenen (begin/eind-datum) en een weekrooster (welke dag, welke
+  tijd) instellen. De app rekent live uit hoeveel lessen dat oplevert. Met "Kalender
+  bijwerken" genereer je de lessen; je krijgt eerst te zien wat er verandert voordat er
+  iets wordt toegepast.
+- **Lesgevers** -- de lijst met mensen die kunnen lesgeven, met hun ervaring. Kan met de
+  hand ingevuld worden of geïmporteerd uit een Excel-bestand.
+- **Beschikbaarheid** -- maak een ronde aan voor een seizoen; de app genereert een script
+  waarmee in twee minuten een Google Form met alle lessen en een naam-keuzelijst klaarstaat.
+  Antwoorden importeer je terug met hetzelfde paneel.
+- **Inroosteren** -- gebeurt in het middenpaneel, dat altijd het rooster toont. Wijs met de
+  hand lesgevers toe, of klik "Automatisch invullen" voor een voorstel (dat je per les kunt
+  goed- of afkeuren voordat het wordt toegepast). Het rechterpaneel toont problemen
+  (bijvoorbeeld te weinig lesgevers) en hoe de belasting verdeeld is.
+- **Delen** -- exporteer naar Excel om te delen via Google Drive. Wijzigingen die daar
+  direct worden gemaakt (bijvoorbeeld iemand die zelf zijn naam invult) kun je met dezelfde
+  knop weer terughalen; de app laat per wijziging zien wat er anders is voordat het wordt
+  toegepast.
+
+## Het projectbestand
+
+Alles staat in één `.lesplan`-bestand: seizoenen, rooster, lesgevers, beschikbaarheid en
+het huidige rooster. Bewaar dit bestand ergens waar je opvolger er ook bij kan (bijvoorbeeld
+de gedeelde Drive-map van de commissie) -- dat bestand is de volledige overdracht naar
+volgend jaar.
+
+## Problemen
+
+Gaat er iets mis, dan toont de app een melding met een knop "Kopieer technische details".
+Plak die in een bugreport. Details staan ook altijd in
+`%LOCALAPPDATA%\Lesgeefplanner\log.txt`.
+
+## Ontwikkelen
+
+Dit project gebruikt [uv](https://docs.astral.sh/uv/). Vanuit de projectmap:
+
+```sh
+uv sync              # dependencies installeren
+uv run lesgeefplanner  # de app starten
+uv run pytest         # tests draaien
 ```
 
-# Seizoen inroosteren
-
-* **Maak een `Lesgevers` sheet** in een excel bestand met de namen van iedereen in de commissie (kan in hetzelfde bestand als de planning zijn). Dit is om ervaring bij te kunnen houden maar ook vooral om te kunnen zien wie nog ontbreekt in de datumprikker. Het moet tenminste kolommen `Naam`, `Ervaring`  en `Actief` hebben. Waarbij `Ervaring` bijvoorbeeld het aantal jaren exclusief de huidige is.
-
-| Naam | Ervaring (jaren) | Actief |
-|------|----------------|--------|
-| Jan Jansen | 3 | true |
-| Piet Peters | 2 | false |
-
-* **Maak een datumprikker** aan, zorg (vanzelfsprekend) dat de data en tijden zo veel mogelijk overeen komen met de lessen in de planning voor een specifiek seizoen. Het wordt gemeld als er iets ontbreekt.
-* **Exporteer de datumprikker naar excel**, update hem af en toe door opnieuw te downloaden zodra meer mensen het hebben ingevuld.
-* (Optioneel) pas `rooster_config.yml` voor configuratie van het rooster algoritme.
+De architectuur en de belangrijkste ontwerpkeuzes staan in `docs/DESIGN.md`, het
+uitvoeringsplan in `docs/PLAN.md`, en beslissingen die tijdens de bouw zijn gemaakt (met
+reden) in `docs/BESLISSINGEN.md`.

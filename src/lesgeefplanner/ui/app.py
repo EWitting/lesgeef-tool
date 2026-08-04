@@ -1,10 +1,10 @@
 """NiceGUI-app: startscherm of de drie-zone-lay-out (docs/DESIGN.md §2.6).
 
 header: projectnaam + opgeslagen-indicator, undo/redo, sluiten.
-links:  inklapbare rail met Lesgevers en Beschikbaarheid (rondes). Jaarplanning en Config
-        volgen in fase 8/9.
+links:  stappenbalk (klaar/aandacht/leeg per onderdeel) + tabs: Jaarplanning, Lesgevers,
+        Beschikbaarheid, Excel ("Delen").
 midden: de planning, ALTIJD zichtbaar (dit is het hart van de app).
-rechts: inspector -- gezondheid/les/persoon (fase 5)."""
+rechts: inspector -- gezondheid/les/persoon."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -13,6 +13,7 @@ from nicegui import ui
 from platformdirs import user_documents_dir
 
 from ..domain.formatting import format_datum_lang
+from . import stappen
 from .bestandsdialoog import kies_bestand_opslaan, native_beschikbaar
 from .dialogen.excel import create_excel_paneel
 from .dialogen.jaarplanning import create_jaarplanning_paneel
@@ -98,11 +99,20 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             f"width: {_LINKS_PANEEL_BREEDTE}; min-width: 220px; height: calc(100vh - 56px); "
             "overflow-y: auto; border-right: 1px solid #e0e0e0; padding: 8px; margin: 0;"
         ) as links_paneel:
+            with ui.row().classes("q-gutter-sm items-center full-width").style(
+                "flex-wrap: wrap; row-gap: 2px;"
+            ):
+                stap_badges: dict[str, ui.label] = {}
+                for stap_naam in (
+                    "Jaarplanning", "Lesgevers", "Beschikbaarheid", "Inroosteren", "Delen",
+                ):
+                    stap_badges[stap_naam] = ui.label(stap_naam).classes("text-caption")
+
             with ui.tabs().props("dense no-caps").classes("full-width") as links_tabs:
                 jaarplanning_tab = ui.tab("Jaarplanning")
                 lesgevers_tab = ui.tab("Lesgevers")
                 rondes_tab = ui.tab("Beschikbaarheid")
-                excel_tab = ui.tab("Excel")
+                excel_tab = ui.tab("Delen")
             with ui.tab_panels(links_tabs, value=jaarplanning_tab).classes("full-width"):
                 with ui.tab_panel(jaarplanning_tab) as jaarplanning_paneel:
                     create_jaarplanning_paneel(jaarplanning_paneel)
@@ -114,6 +124,19 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                     create_excel_paneel(excel_paneel)
             ui.label("Solver-instellingen volgen in een latere fase.").classes(
                 "text-caption text-grey-6 q-mt-md"
+            )
+
+            _STAP_NAAR_TAB = {
+                "Jaarplanning": jaarplanning_tab, "Lesgevers": lesgevers_tab,
+                "Beschikbaarheid": rondes_tab, "Delen": excel_tab,
+            }
+            for _stap_naam, _tab in _STAP_NAAR_TAB.items():
+                stap_badges[_stap_naam].classes(add="cursor-pointer").on(
+                    "click", lambda tab=_tab: links_tabs.set_value(tab)
+                )
+            stap_badges["Inroosteren"].tooltip(
+                "Vul lessen in via het middenpaneel; het gezondheidspaneel rechts toont "
+                "wat er nog moet gebeuren."
             )
 
         with ui.column().style(
@@ -150,6 +173,10 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         redo_tooltip.set_text(
             f"Opnieuw uitvoeren: {volgende_redo} (Ctrl+Y)" if volgende_redo else "Niets om opnieuw te doen"
         )
+
+        statussen = stappen.alle_stappen(state.doc.project, state.peildatum())
+        for stap_naam, status in statussen.items():
+            stap_badges[stap_naam].set_text(f"{stappen.icoon(status)} {stap_naam}")
 
     def _ververs_na_wijziging() -> None:
         """Ververst header (opgeslagen-indicator, undo/redo), inspectiepaneel (bevindingen,

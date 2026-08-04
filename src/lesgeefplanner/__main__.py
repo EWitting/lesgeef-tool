@@ -1,4 +1,5 @@
-"""Entry point: start de NiceGUI-server op een vrije poort en open de browser."""
+"""Entry point: start de NiceGUI-server op een vrije poort, in een native venster als
+pywebview beschikbaar is (zie docs/BESLISSINGEN.md fase 2), anders in de browser."""
 from __future__ import annotations
 
 import socket
@@ -15,13 +16,32 @@ def _vrije_poort() -> int:
         return s.getsockname()[1]
 
 
+def _pywebview_beschikbaar() -> bool:
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def main() -> None:
     from nicegui import ui
 
     import lesgeefplanner.ui.app  # noqa: F401  registreert de "/" pagina
+    from lesgeefplanner.ui.foutafhandeling import registreer_foutafhandeling
+
+    registreer_foutafhandeling()
 
     poort = _vrije_poort()
-    ui.run(title="Lesgeefplanner", port=poort, reload=False, show=True, native=False)
+    native = _pywebview_beschikbaar()
+    ui.run(
+        title="Lesgeefplanner",
+        port=poort,
+        reload=False,
+        show=not native,
+        native=native,
+        window_size=(1400, 900) if native else None,
+    )
 
 
 if __name__ in {"__main__", "__mp_main__"}:

@@ -10,7 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import Callable
 
-from ..model import Scope
+from ..model import Project, Scope
 from ..planner import PlanResult
 from ..store.document import Document
 from ..store.instellingen import voeg_recent_bestand_toe
@@ -44,6 +44,13 @@ class AppState:
         self.doc = Document.open(pad)
         self.laatste_plan_result = None
         voeg_recent_bestand_toe(pad)
+        self._meld_wijziging()
+
+    def stel_project_in(self, project: Project) -> None:
+        """Voor projecten die niet uit een .lesplan-bestand komen, maar zijn opgebouwd
+        door code (jaarwissel, legacy-import): geen pad totdat de gebruiker opslaat."""
+        self.doc = Document(project)
+        self.laatste_plan_result = None
         self._meld_wijziging()
 
     def opslaan(self, pad: Path | None = None) -> None:
