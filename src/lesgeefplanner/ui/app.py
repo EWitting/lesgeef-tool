@@ -19,6 +19,7 @@ from .dialogen.excel import create_excel_paneel
 from .dialogen.jaarplanning import create_jaarplanning_paneel
 from .dialogen.lesgevers import create_lesgevers_paneel
 from .dialogen.rondes import create_rondes_paneel
+from .dialogen.solver_config import create_solver_config_knop
 from .inspector import Inspector
 from .planning_view import PlanningView
 from .startscherm import create_startscherm
@@ -122,9 +123,9 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                     create_rondes_paneel(rondes_paneel)
                 with ui.tab_panel(excel_tab) as excel_paneel:
                     create_excel_paneel(excel_paneel)
-            ui.label("Solver-instellingen volgen in een latere fase.").classes(
-                "text-caption text-grey-6 q-mt-md"
-            )
+            with ui.row().classes("items-center q-mt-md") as solver_config_rij:
+                create_solver_config_knop(solver_config_rij)
+                ui.label("Solver-instellingen").classes("text-caption text-grey-6")
 
             _STAP_NAAR_TAB = {
                 "Jaarplanning": jaarplanning_tab, "Lesgevers": lesgevers_tab,

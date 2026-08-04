@@ -7,7 +7,7 @@ Dit project gebruikt [uv](https://docs.astral.sh/uv/).
 ```sh
 uv sync              # installeert alle dependencies (incl. dev-groep)
 uv run lesgeefplanner  # start de app (browser als pywebview niet geïnstalleerd is,
-                        # anders een native venster -- zie docs/BESLISSINGEN.md fase 2/9)
+                        # anders een native venster)
 uv run pytest         # draait de testsuite
 ```
 
@@ -22,9 +22,10 @@ De broncode staat in `src/lesgeefplanner/`:
 - `ui/` -- de NiceGUI-app. `ui/*bewerkingen.py`-bestanden bevatten de mutatielogica per
   onderdeel (los van de weergave), zodat die ook zonder browser te testen zijn.
 
-Zie `docs/DESIGN.md` voor de architectuur en de belangrijkste ontwerpkeuzes, `docs/PLAN.md`
-voor het (uitgevoerde) stappenplan, en `docs/BESLISSINGEN.md` voor keuzes die tijdens de
-bouw zijn gemaakt met hun reden.
+Het ontwerpdocument, het uitvoeringsplan en het beslissingenlogboek van de rewrite bestaan
+lokaal (`docs/DESIGN.md`, `docs/PLAN.md`, `docs/BESLISSINGEN.md`) maar zijn bewust niet in
+git getrackt (zie `.gitignore`) -- het zijn interne proces-/planningsnotities van de bouw,
+geen doorlopende projectdocumentatie. Vraag de vorige onderhouder erom als je ze nodig hebt.
 
 ## Een release maken
 

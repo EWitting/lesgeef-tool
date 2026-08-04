@@ -64,6 +64,4 @@ uv run lesgeefplanner  # de app starten
 uv run pytest         # tests draaien
 ```
 
-De architectuur en de belangrijkste ontwerpkeuzes staan in `docs/DESIGN.md`, het
-uitvoeringsplan in `docs/PLAN.md`, en beslissingen die tijdens de bouw zijn gemaakt (met
-reden) in `docs/BESLISSINGEN.md`. Hoe je een release bouwt staat in `docs/ONTWIKKELAAR.md`.
+Hoe je lokaal ontwikkelt en een release bouwt staat in `docs/ONTWIKKELAAR.md`.

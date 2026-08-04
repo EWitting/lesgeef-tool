@@ -13,3 +13,10 @@ wheels/
 *.csv
 
 /data
+
+# Interne ontwerp-/planningsdocumenten van de rewrite (proces- en beslissingslogboek van
+# de AI-begeleide bouw) -- niet bedoeld voor de publieke repo. docs/ONTWIKKELAAR.md
+# (bouw-/releasehandleiding) blijft wel getrackt.
+/docs/DESIGN.md
+/docs/PLAN.md
+/docs/BESLISSINGEN.md
