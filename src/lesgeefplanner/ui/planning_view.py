@@ -12,6 +12,7 @@ from typing import Callable
 
 from nicegui import ui
 
+from ..domain.analysis import Bevinding
 from ..domain.formatting import format_datum, format_datum_lang, format_tijd, format_tijdvak
 from ..model.entities import Les, les_seizoen_id
 from ..model.project import Project
@@ -26,6 +27,9 @@ _EVEN_WEEK_KLEUR = "#dce6f1"
 _ONEVEN_WEEK_KLEUR = "#f0f0f0"
 _PIN = "\U0001F4CC"
 
+_ERNST_RANG = {"fout": 3, "waarschuwing": 2, "info": 1}
+_ERNST_KLEUR = {"fout": "text-red-8", "waarschuwing": "text-orange-6", "info": "text-blue-6"}
+
 
 class LessonRow:
     """Eén rij, één keer opgebouwd. `ververs()` past alleen de teksten/klassen/menu-inhoud
@@ -38,8 +42,10 @@ class LessonRow:
         project: Project,
         nieuwe_week: bool,
         on_wijziging: Callable[[str], None],
+        on_selecteer: Callable[[str], None],
     ) -> None:
         self._on_wijziging = on_wijziging
+        self._on_selecteer = on_selecteer
         self._les_id = les.id
 
         with container:
@@ -47,14 +53,19 @@ class LessonRow:
                 "flex-wrap: nowrap; min-height: 32px;"
                 + (_WEEK_GRENS_STIJL if nieuwe_week else _GEEN_WEEK_GRENS_STIJL)
             ) as self.root:
-                self.stip = ui.icon("circle").classes("text-transparent").style(
-                    "font-size: 9px; width: 12px;"
-                )
-                self.datum_label = ui.label().classes("text-caption").style("width: 110px;")
-                self.tijd_label = ui.label().classes("text-caption").style("width: 95px;")
-                self.titel_label = ui.label().classes("text-caption").style(
-                    "width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-                )
+                with ui.row().classes("items-center cursor-pointer").style(
+                    "flex-wrap: nowrap; gap: 4px;"
+                ).on("click", lambda: self._on_selecteer(self._les_id)) as self.info_gebied:
+                    self.stip = ui.icon("circle").classes("text-transparent").style(
+                        "font-size: 9px; width: 12px;"
+                    )
+                    with self.stip:
+                        self.stip_tooltip = ui.tooltip("")
+                    self.datum_label = ui.label().classes("text-caption").style("width: 110px;")
+                    self.tijd_label = ui.label().classes("text-caption").style("width: 95px;")
+                    self.titel_label = ui.label().classes("text-caption").style(
+                        "width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                    )
                 self.slots_container = ui.row().classes("items-center").style(
                     "flex-wrap: nowrap; gap: 4px;"
                 )
@@ -66,6 +77,7 @@ class LessonRow:
                     self.acties_menu = ui.menu()
 
         self.ververs(les, project)
+        self.zet_bevindingen([])
 
     # ------------------------------------------------------------------
 
@@ -111,6 +123,17 @@ class LessonRow:
                 self._ververs_slot(i, les, project)
 
         self._ververs_acties_menu(les)
+
+    def zet_bevindingen(self, bevindingen: list[Bevinding]) -> None:
+        """Kleurt de stip naar de hoogste ernst in `bevindingen` (leeg = onzichtbaar), met
+        de titels als tooltip. Wordt door de inspector aangeroepen na elke analyse."""
+        if not bevindingen:
+            self.stip.classes(replace="text-transparent")
+            self.stip_tooltip.set_text("")
+            return
+        hoogste = max(bevindingen, key=lambda b: _ERNST_RANG[b.ernst])
+        self.stip.classes(replace=_ERNST_KLEUR[hoogste.ernst])
+        self.stip_tooltip.set_text("; ".join(b.titel for b in bevindingen))
 
     def _ververs_slot(self, i: int, les: Les, project: Project) -> None:
         knop = self.slot_knoppen[i]
@@ -252,7 +275,10 @@ class LessonRow:
 
 class PlanningView:
     def __init__(
-        self, container: ui.column, on_wijziging_header: Callable[[], None] | None = None
+        self,
+        container: ui.column,
+        on_wijziging_header: Callable[[], None] | None = None,
+        on_selecteer_les: Callable[[str], None] | None = None,
     ) -> None:
         self._container = container
         self._rows: dict[str, LessonRow] = {}
@@ -260,6 +286,9 @@ class PlanningView:
         # zodat de "niet opgeslagen"-indicator en de undo/redo-knoppen in de header
         # meteen kloppen, ook al gebeurt de bewerking hier in het middenpaneel.
         self._on_wijziging_header = on_wijziging_header or (lambda: None)
+        # Wordt aangeroepen als de gebruiker op het datum/tijd-gebied van een rij klikt --
+        # het inspectiepaneel (fase 5) toont dan de details van die les.
+        self._on_selecteer_les = on_selecteer_les or (lambda les_id: None)
 
     def rebuild(self) -> None:
         self._container.clear()
@@ -312,7 +341,10 @@ class PlanningView:
                 nieuwe_week = week != vorige_week
                 vorige_week = week
 
-                rij = LessonRow(self._container, les, project, nieuwe_week, self._na_wijziging)
+                rij = LessonRow(
+                    self._container, les, project, nieuwe_week,
+                    self._na_wijziging, self._on_selecteer_les,
+                )
                 self._rows[les.id] = rij
 
     def refresh_les(self, les_id: str) -> None:
@@ -332,6 +364,24 @@ class PlanningView:
     def refresh_lessen(self, les_ids) -> None:
         for les_id in les_ids:
             self.refresh_les(les_id)
+
+    def stel_bevindingen_in(self, per_les: dict[str, list[Bevinding]]) -> None:
+        """Zet de issue-stip per rij. Aangeroepen door de inspector na elke analyse."""
+        for les_id, rij in self._rows.items():
+            rij.zet_bevindingen(per_les.get(les_id, []))
+
+    def scroll_en_licht_op(self, les_id: str) -> None:
+        """Scrollt naar de rij en licht hem 2 seconden op (docs/DESIGN.md §5: klikken op
+        een bevinding brengt je bij het juiste object)."""
+        rij = self._rows.get(les_id)
+        if rij is None:
+            return
+        ui.run_javascript(
+            f'getElement({rij.root.id}).$el.scrollIntoView('
+            f'{{behavior: "smooth", block: "center"}});'
+        )
+        rij.root.classes(add="rij-opgelicht")
+        ui.timer(2.0, lambda: rij.root.classes(remove="rij-opgelicht"), once=True)
 
     def _na_wijziging(self, les_id: str) -> None:
         """Ververst deze les plus alle andere lessen in dezelfde ISO-week (bv. voor
@@ -414,6 +464,8 @@ class PlanningView:
             result = await loop.run_in_executor(None, los_op, request)
         finally:
             melding.dismiss()
+
+        state.laatste_plan_result = result
 
         if result.status == "onhaalbaar":
             ui.notify(

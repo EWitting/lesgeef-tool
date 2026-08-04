@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from ..domain.beschikbaarheid import verzamel_beschikbaarheid
 from ..model.availability import Antwoordwaarde
 from ..model.config import SolverConfig
 from ..model.entities import Les, Lesgever, les_seizoen_id
@@ -45,7 +46,7 @@ def bouw_request(project: Project, scope: Scope, peildatum: date) -> PlanRequest
     ]
 
     lesgevers = [lg for lg in project.lesgevers if lg.actief]
-    beschikbaarheid = _verzamel_beschikbaarheid(project)
+    beschikbaarheid = verzamel_beschikbaarheid(project)
 
     return PlanRequest(
         lessen_in_scope=lessen_in_scope,
@@ -55,17 +56,3 @@ def bouw_request(project: Project, scope: Scope, peildatum: date) -> PlanRequest
         config=project.solver_config,
         peildatum=peildatum,
     )
-
-
-def _verzamel_beschikbaarheid(project: Project) -> dict[tuple[str, str], Antwoordwaarde]:
-    """Nieuwste ronde wint bij overlappende (lesgever, les)-paren. Een lesgever die 'nee'
-    antwoordde op de screeningvraag (doet_mee=False) telt als volledig onbeschikbaar --
-    zijn/haar antwoorden worden genegeerd."""
-    resultaat: dict[tuple[str, str], Antwoordwaarde] = {}
-    for ronde in sorted(project.rondes, key=lambda r: r.aangemaakt_op):
-        for antwoord in ronde.antwoorden:
-            if not antwoord.doet_mee:
-                continue
-            for les_id, waarde in antwoord.waarden.items():
-                resultaat[(antwoord.lesgever_id, les_id)] = waarde
-    return resultaat

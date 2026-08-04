@@ -14,6 +14,7 @@ from platformdirs import user_documents_dir
 
 from ..domain.formatting import format_datum_lang
 from .bestandsdialoog import kies_bestand_opslaan, native_beschikbaar
+from .inspector import Inspector
 from .planning_view import PlanningView
 from .startscherm import create_startscherm
 from .state import state
@@ -24,6 +25,9 @@ _RECHTS_PANEEL_BREEDTE = "340px"
 
 @ui.page("/")
 def index() -> None:
+    ui.add_head_html(
+        "<style>.rij-opgelicht { outline: 2px solid #f6ad55; outline-offset: -2px; }</style>"
+    )
     root = ui.column().classes("w-full no-wrap").style(
         "height: 100vh; margin: 0; padding: 0; gap: 0;"
     )
@@ -98,16 +102,18 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             "flex: 1; height: calc(100vh - 56px); overflow-y: auto; padding: 0; margin: 0; "
             "min-width: 0;"
         ) as midden_paneel:
-            planning_view = PlanningView(midden_paneel, on_wijziging_header=lambda: ververs_header())
+            planning_view = PlanningView(
+                midden_paneel,
+                on_wijziging_header=lambda: _ververs_na_wijziging(),
+                on_selecteer_les=lambda les_id: inspector.toon_les(les_id),
+            )
             planning_view.rebuild()
 
         with ui.column().style(
             f"width: {_RECHTS_PANEEL_BREEDTE}; min-width: 260px; height: calc(100vh - 56px); "
             "overflow-y: auto; border-left: 1px solid #e0e0e0; padding: 8px; margin: 0;"
-        ):
-            ui.label("Gezondheid van de planning verschijnt hier (vanaf een latere fase).").classes(
-                "text-caption text-grey-6"
-            )
+        ) as rechts_paneel:
+            inspector = Inspector(rechts_paneel, planning_view)
 
     def ververs_header() -> None:
         assert state.doc is not None
@@ -127,13 +133,20 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             f"Opnieuw uitvoeren: {volgende_redo} (Ctrl+Y)" if volgende_redo else "Niets om opnieuw te doen"
         )
 
+    def _ververs_na_wijziging() -> None:
+        """Ververst zowel de header (opgeslagen-indicator, undo/redo) als het
+        inspectiepaneel (bevindingen, issue-stippen) -- na ELKE wijziging aan het project,
+        ongeacht of die via het middenpaneel, undo/redo, of de solver kwam."""
+        ververs_header()
+        inspector.render()
+
     def _ongedaan_maken() -> None:
         assert state.doc is not None
         beschrijving = state.doc.ongedaan_maken()
         if beschrijving is not None:
             ui.notify(f"Ongedaan gemaakt: {beschrijving}", type="info")
             planning_view.rebuild()
-            ververs_header()
+            _ververs_na_wijziging()
 
     def _opnieuw() -> None:
         assert state.doc is not None
@@ -141,7 +154,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         if beschrijving is not None:
             ui.notify(f"Opnieuw uitgevoerd: {beschrijving}", type="info")
             planning_view.rebuild()
-            ververs_header()
+            _ververs_na_wijziging()
 
     async def _opslaan() -> None:
         assert state.doc is not None
@@ -193,7 +206,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
 
     ui.keyboard(on_key=_op_toets)
 
-    state.on_change(lambda: (planning_view.rebuild(), ververs_header()))
+    state.on_change(lambda: (planning_view.rebuild(), _ververs_na_wijziging()))
     ververs_header()
     ui.timer(5.0, lambda: _autosave_tick(ververs_header))
 

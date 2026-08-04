@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..model import Scope
+from ..planner import PlanResult
 from ..store.document import Document
 from ..store.instellingen import voeg_recent_bestand_toe
 
@@ -18,6 +19,10 @@ from ..store.instellingen import voeg_recent_bestand_toe
 class AppState:
     def __init__(self) -> None:
         self.doc: Document | None = None
+        # Resultaat van de laatst gedraaide solver-run, ook als het voorstel niet (volledig)
+        # is toegepast -- het inspectiepaneel toont hiermee "waarom deze score?" en de
+        # per-les Uitleg (docs/DESIGN.md §5) zonder de solver opnieuw te hoeven draaien.
+        self.laatste_plan_result: PlanResult | None = None
         self._on_change: list[Callable[[], None]] = []
 
     @property
@@ -32,10 +37,12 @@ class AppState:
 
     def nieuw_project(self, naam: str) -> None:
         self.doc = Document.nieuw(naam)
+        self.laatste_plan_result = None
         self._meld_wijziging()
 
     def open_project(self, pad: Path) -> None:
         self.doc = Document.open(pad)
+        self.laatste_plan_result = None
         voeg_recent_bestand_toe(pad)
         self._meld_wijziging()
 

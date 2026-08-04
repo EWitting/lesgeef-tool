@@ -15,6 +15,7 @@ import time as time_module
 
 from ortools.sat.python import cp_model
 
+from ..domain.werkverdeling import bereken_doel
 from ..model.entities import les_seizoen_id
 from .request import PlanRequest
 from .result import PlanResult
@@ -237,7 +238,7 @@ def _voeg_werkverdeling_termen_toe(
 
         alle_weken = {les.datum.isocalendar()[:2] for les in scope_lessen + context_lessen}
         aantal_weken = len(alle_weken) if alle_weken else 1
-        doel = max(1, round(config.richtlijn_lessen_per_week * aantal_weken))
+        doel = bereken_doel(config.richtlijn_lessen_per_week, aantal_weken)
 
         for lg in request.lesgevers:
             scope_vars = [

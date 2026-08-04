@@ -206,3 +206,45 @@ eerdere keuze kan een latere fase raken.
   `ui.notification(spinner=True, timeout=None)` die na afloop wordt gedismisst. Voorkomt
   dat de NiceGUI-eventloop blokkeert tijdens de (tot `max_rekentijd_seconden`) durende
   CP-SAT-solve.
+
+## 2026-08-04 — Fase 5
+
+- **`domain/werkverdeling.py` en `domain/beschikbaarheid.py` toegevoegd als gedeelde laag**
+  tussen de solver (`planner/`), de analyse (`domain/analysis.py`) en het inspectiepaneel
+  (`ui/inspector.py`). Zonder dit zouden er drie plekken zijn die zelf uitrekenen wat "het
+  doel" of "iemands beschikbaarheid" is, met het risico dat ze uit elkaar gaan lopen (bv. de
+  solver optimaliseert tegen een ander getal dan wat het balkdiagram toont). `bereken_doel()`
+  wordt nu letterlijk door alle drie gebruikt. `planner/solve.py` en `planner/request.py` zijn
+  aangepast om deze gedeelde functies te gebruiken in plaats van hun eigen kopie (die er in
+  fase 4 nog wel was).
+- **`domain/report.py` is een BEWUSTE vereenvoudiging** van het oude `src/report.py`: geen
+  aparte "lesgever-verdeling"-sectie meer, want een lijst met ieders aantal lessen is geen
+  *bevinding* (geen probleem om te melden) maar een statistiek -- die hoort thuis in het
+  balkdiagram van het inspectiepaneel. Het tekstrapport groepeert nu simpelweg op ernst
+  (FOUTEN/WAARSCHUWINGEN/INFO). DESIGN.md zei alleen "rendert naar de bestaande platte
+  tekst"; dit is de concrete invulling.
+- **`lesgever_niet_gereageerd` is per ronde, niet globaal**: als een lesgever niet
+  gereageerd heeft op een ronde die geen enkele les in de huidige scope raakt, wordt dat NIET
+  gemeld. Dit voorkomt dat oude, allang afgesloten rondes irrelevante meldingen blijven geven
+  zodra een nieuwe scope wordt bekeken.
+- **`lesgever_boven_richtlijn`/`lesgever_onder_richtlijn` gebruiken de HELE seizoenstelling**
+  (niet beperkt tot de zichtbare scope), maar worden alleen getoond voor seizoenen die de
+  scope daadwerkelijk raakt -- exact dezelfde scope/context-splitsing als de solver
+  (`planner/request.py`). Dit was nodig om consistent te blijven met hoe de solver "boven de
+  richtlijn" definieert; anders zou het inspectiepaneel een ander verhaal vertellen dan
+  waar de solver op stuurt.
+- **Klikbaarheid**: `LessonRow` kreeg een apart `info_gebied` (datum/tijd/titel-cluster,
+  los van de lesgever-knoppen) met een klikhandler die de les in de inspector opent, zodat
+  een klik daar niet per ongeluk ook een lesgever-menu opent. Scrollen-en-oplichten
+  (`PlanningView.scroll_en_licht_op`) gebruikt `ui.run_javascript` met NiceGUI's
+  `getElement(id).$el.scrollIntoView(...)`-patroon, omdat er geen kant-en-klare
+  `scroll_into_view()`-methode op een Element bestaat.
+- **"Kopieer rapport" gebruikt `navigator.clipboard.writeText()` via `ui.run_javascript`**,
+  met de tekst als `json.dumps(...)` (niet `!r`) om er zeker van te zijn dat de string
+  geldige JS-syntax oplevert ongeacht welke tekens erin zitten.
+- **`state.laatste_plan_result`** (niet in DESIGN.md's dataklasse-lijst voor `AppState`,
+  want die module bestond toen nog niet) bewaart het resultaat van de laatst gedraaide
+  solver-run, ook als het voorstel niet is toegepast. Het inspectiepaneel gebruikt dit voor
+  "Waarom deze score?" en de per-les solver-uitleg. Wordt gereset bij het openen/aanmaken
+  van een ander project (anders zou een oude solver-run van project A worden getoond in
+  project B).
