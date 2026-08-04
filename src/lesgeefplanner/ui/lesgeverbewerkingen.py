@@ -49,3 +49,23 @@ def verwijder_lesgever(lesgever_id: str) -> None:
                 les.toewijzingen = [
                     tw for tw in les.toewijzingen if tw.lesgever_id != lesgever_id
                 ]
+
+
+def samenvoeg_geimporteerde_lesgevers(geimporteerd: list[Lesgever]) -> int:
+    """Voegt geïmporteerde lesgevers (exchange/roster_import.py) samen met de bestaande
+    lijst: exacte naammatch -> ervaring/actief bijwerken, geen match -> toevoegen als
+    nieuwe lesgever. Geeft het aantal verwerkte lesgevers terug."""
+    assert state.doc is not None
+    if not geimporteerd:
+        return 0
+    with state.doc.muteer("Lesgevers geïmporteerd uit Excel"):
+        project = state.doc.project
+        bestaand_by_naam = {lg.naam: lg for lg in project.lesgevers}
+        for nieuw in geimporteerd:
+            bestaand = bestaand_by_naam.get(nieuw.naam)
+            if bestaand is not None:
+                bestaand.ervaring_jaren = nieuw.ervaring_jaren
+                bestaand.actief = nieuw.actief
+            else:
+                project.lesgevers.append(nieuw)
+    return len(geimporteerd)

@@ -307,3 +307,46 @@ eerdere keuze kan een latere fase raken.
   apart rapport te hoeven raadplegen) zonder een grote nieuwe matrix-component te bouwen.
   Een volledige matrix-overzicht kan alsnog later als aparte deelweergave, mocht dat nodig
   blijken.
+
+## 2026-08-04 — Fase 7
+
+- **`_meta`-blad schrijven via een tweede openpyxl-stap na xlsxwriter.** xlsxwriter kan
+  geen bestaand bestand openen/aanvullen (het bouwt alleen van nul op), dus
+  `excel_export.py` sluit eerst de xlsxwriter-workbook normaal af en opent het resultaat
+  daarna opnieuw met openpyxl om het verborgen `_meta`-blad toe te voegen. Niet zo
+  vermeld in DESIGN.md, maar de enige praktische manier om beide bibliotheken te combineren
+  zonder xlsxwriter's opmaak-mogelijkheden (merges, formats) op te geven.
+- **`Wijziging.soort` heeft geen `"tijd"`-variant gekregen**, ondanks dat DESIGN.md §4.4
+  die noemt in de Literal. Een tijdswijziging in de sheet zou de rij feitelijk laten
+  matchen met een ANDERE les (of geen enkele) via de (dag, maand, tijd)-terugval, wat de
+  koppeling zelf al onbetrouwbaar maakt voor precies het geval dat "tijd" zou moeten
+  detecteren. Tijd wijzigen hoort bij de app zelf (fase 3's 'Tijd aanpassen'), niet bij de
+  Excel-samenvoeging. Als dit in de praktijk gemist wordt, kan het alsnog toegevoegd worden
+  met een aparte, voorzichtige match-strategie.
+- **Datum/tijd-terugval matcht zonder jaar** (`_parse_dag_maand_cel`, dag+maand alleen):
+  de Datum-kolom wordt als TEKST geëxporteerd (bv. 'woensdag 22 apr', zonder jaartal), dus
+  een jaar erbij verzinnen zou gokken zijn. Dezelfde aanpak als forms_import.py's
+  terugvalpad; beide hebben nu dezelfde reden en dezelfde oplossing.
+- **`lees_sheet()` geeft een derde return-waarde (`niet_gekoppelde rijen`)** terug boven op
+  DESIGN.md's `tuple[list[Wijziging], list[NaamProbleem]]`. DESIGN.md's eigen tekst zegt
+  expliciet "markeer de rij als niet-koppelbaar en toon hem apart" maar de voorgestelde
+  functiehandtekening had daar geen plek voor -- een gat, hier ingevuld door de tuple met
+  een derde lijst uit te breiden in plaats van een aparte aanroep te verzinnen.
+- **`NaamProbleem` wordt hergebruikt tussen forms_import.py en excel_import.py** (met een
+  toegevoegd optioneel `les_id`-veld voor de Excel-kant) in plaats van twee bijna
+  identieke dataklassen te maken. Zie de uitgebreide toelichting in exchange/types.py zelf.
+- **Roster-import (lesgevers.xlsx) voegt SAMEN op exacte naam**, niet op fuzzy match: een
+  bestaande lesgever met exact dezelfde naam krijgt bijgewerkte ervaring/actief, een naam
+  die niet exact voorkomt wordt een NIEUWE lesgever (geen wizard). Dat is bewust
+  eenvoudiger dan de fuzzy-wizard bij rondes/Excel-wijzigingen: een lesgeverslijst-import
+  gebeurt meestal eenmalig bij een compleet nieuw seizoen (iedereen erin), niet als
+  incrementele correctie op een al druk gebruikte lijst, dus het risico van "per ongeluk
+  een dubbele Anne" is klein en makkelijk zelf op te merken en handmatig te herstellen
+  (verwijderknop) t.o.v. de complexiteit van er een derde wizard-variant bij te bouwen.
+- **Zowel "Automatisch invullen" (fase 4) als "Wijzigingen uit Excel" (deze fase) gebruiken
+  nu dezelfde `dialogen/diff_dialoog.py`.** Precies zoals DESIGN.md §7 voorspelde: "bouw
+  het één keer". Geen aanpassing aan diff_dialoog.py was nodig.
+- **Excel-import gebruikt een upload-widget, geen native bestandsdialoog** (in
+  tegenstelling tot Opslaan/Exporteren, die wel de native dialoog gebruiken waar
+  beschikbaar). Consistent met hoe fase 6's rondes-import al werkte: één interactiepatroon
+  voor "haal een bestand van de gebruiker op" in plaats van twee naast elkaar.

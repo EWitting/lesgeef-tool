@@ -2,6 +2,7 @@ from datetime import date, time
 
 import pytest
 
+from lesgeefplanner.model import Lesgever
 from lesgeefplanner.model.entities import Les, Toewijzing
 from lesgeefplanner.store.document import Document
 from lesgeefplanner.ui import lesgeverbewerkingen as lgb
@@ -54,3 +55,25 @@ def test_verwijder_lesgever_ruimt_toewijzingen_op(state):
 
     assert state.doc.project.lesgevers == []
     assert state.doc.project.lessen[0].toewijzingen == []
+
+
+def test_samenvoeg_geimporteerde_lesgevers_update_bestaande(state):
+    lgb.voeg_lesgever_toe("Anne")
+    lgb.wijzig_lesgever(state.doc.project.lesgevers[0].id, ervaring_jaren=1)
+
+    aantal = lgb.samenvoeg_geimporteerde_lesgevers(
+        [Lesgever(naam="Anne", ervaring_jaren=5, actief=False)]
+    )
+    assert aantal == 1
+    assert len(state.doc.project.lesgevers) == 1
+    lg = state.doc.project.lesgevers[0]
+    assert lg.ervaring_jaren == 5
+    assert lg.actief is False
+
+
+def test_samenvoeg_geimporteerde_lesgevers_voegt_nieuwe_toe(state):
+    lgb.voeg_lesgever_toe("Anne")
+    aantal = lgb.samenvoeg_geimporteerde_lesgevers([Lesgever(naam="Bob", ervaring_jaren=2)])
+    assert aantal == 1
+    namen = {lg.naam for lg in state.doc.project.lesgevers}
+    assert namen == {"Anne", "Bob"}
