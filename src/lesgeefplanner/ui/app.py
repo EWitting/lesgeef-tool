@@ -15,6 +15,7 @@ from platformdirs import user_documents_dir
 from ..domain.formatting import format_datum_lang
 from .bestandsdialoog import kies_bestand_opslaan, native_beschikbaar
 from .dialogen.excel import create_excel_paneel
+from .dialogen.jaarplanning import create_jaarplanning_paneel
 from .dialogen.lesgevers import create_lesgevers_paneel
 from .dialogen.rondes import create_rondes_paneel
 from .inspector import Inspector
@@ -98,17 +99,20 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             "overflow-y: auto; border-right: 1px solid #e0e0e0; padding: 8px; margin: 0;"
         ) as links_paneel:
             with ui.tabs().props("dense no-caps").classes("full-width") as links_tabs:
+                jaarplanning_tab = ui.tab("Jaarplanning")
                 lesgevers_tab = ui.tab("Lesgevers")
                 rondes_tab = ui.tab("Beschikbaarheid")
                 excel_tab = ui.tab("Excel")
-            with ui.tab_panels(links_tabs, value=lesgevers_tab).classes("full-width"):
+            with ui.tab_panels(links_tabs, value=jaarplanning_tab).classes("full-width"):
+                with ui.tab_panel(jaarplanning_tab) as jaarplanning_paneel:
+                    create_jaarplanning_paneel(jaarplanning_paneel)
                 with ui.tab_panel(lesgevers_tab) as lesgevers_paneel:
                     create_lesgevers_paneel(lesgevers_paneel)
                 with ui.tab_panel(rondes_tab) as rondes_paneel:
                     create_rondes_paneel(rondes_paneel)
                 with ui.tab_panel(excel_tab) as excel_paneel:
                     create_excel_paneel(excel_paneel)
-            ui.label("Jaarplanning en instellingen volgen in een latere fase.").classes(
+            ui.label("Solver-instellingen volgen in een latere fase.").classes(
                 "text-caption text-grey-6 q-mt-md"
             )
 
@@ -154,6 +158,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         middenpaneel, de linkerrail, undo/redo, of de solver kwam."""
         ververs_header()
         inspector.render()
+        create_jaarplanning_paneel(jaarplanning_paneel)
         create_lesgevers_paneel(lesgevers_paneel)
         create_rondes_paneel(rondes_paneel)
         create_excel_paneel(excel_paneel)

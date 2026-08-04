@@ -350,3 +350,40 @@ eerdere keuze kan een latere fase raken.
   tegenstelling tot Opslaan/Exporteren, die wel de native dialoog gebruiken waar
   beschikbaar). Consistent met hoe fase 6's rondes-import al werkte: één interactiepatroon
   voor "haal een bestand van de gebruiker op" in plaats van twee naast elkaar.
+
+## 2026-08-04 — Fase 8
+
+- **`legacy_import.py` genereert reguliere lessen via `domain/calendar.py`** (`bereken_kalender_diff` + `pas_kalender_diff_toe`) in plaats van de weekiteratie van het oude
+  `src/parse.py` te herschrijven. Zelfde resultaat, één plek die "hoe genereer je lessen
+  uit een weekrooster" kent -- als daar ooit een bug in zit, hoeft hij maar op één plek
+  gefixt te worden.
+- **Overlappende seizoenen: eerste in de lijst wint**, bij zowel `extra-lessen` als
+  activiteiten-matching. De oude `src/parse.py` had hier eigenlijk een net andere
+  (impliciete) regel bij extra-lessen ("laatste seizoen in de yaml-volgorde dat matcht"),
+  maar dat was nooit een bewuste keuze -- gewoon een bijeffect van een lus zonder `break`.
+  Voor een eenmalige migratie is bit-voor-bit compatibiliteit met die bijeffect niet
+  waardevol; consistent zijn met `domain/calendar.py`'s "eerste wint"-regel (die WEL bewust
+  is, zie fase 2) is dat wel.
+- **`excel_import.py`'s `_parse_dag_maand_cel`/`_parse_tijd_cel` worden hergebruikt in
+  `legacy_import.py`** voor het koppelen van de oude `planning.xlsx` aan de net
+  gegenereerde lessen (zelfde probleem: tekst-datum zonder jaar). Bewust geen kopie
+  gemaakt; het zijn moduleprivate helpers (`_`-prefix) maar binnen dezelfde package is dat
+  in dit project geen harde grens, alleen een signaal "niet de publieke API".
+- **Lesgevers-import bij migratie hergebruikt `exchange/roster_import.py` ongewijzigd.**
+  Als de kolommen niet automatisch herkend worden, wordt dat een waarschuwing in plaats van
+  een interactieve wizard (die kan een eenmalige, niet-interactieve migratiefunctie niet
+  tonen) -- de gebruiker importeert de lesgeverslijst dan na de migratie alsnog los via het
+  Lesgevers-paneel (fase 6/7), waar de wizard wel bestaat.
+- **Nog geen UI voor `SolverConfig`** (dialogen/solver_config.py stond wel in DESIGN.md §7,
+  maar is-net als lesgevers.py eerder ook was- aan geen enkele PLAN.md-fase toegewezen).
+  De config heeft bruikbare, geteste standaardwaarden (overgenomen uit de oude
+  `roosterconfig.yaml`), dus dit blokkeert normaal gebruik niet. De linkerrail toont
+  bewust de tekst "Solver-instellingen volgen in een latere fase" in plaats van dit stil te
+  laten liggen. Op te pakken in een toekomstige fase; de oude `roosterconfig.yaml` wordt
+  vooralsnog niet meegenomen in `legacy_import.py`.
+- **Datumvelden in de jaarplanning-UI zijn tekstinvoer (JJJJ-MM-DD)**, geen `ui.date()`-
+  kalenderwidget zoals bij "Extra les toevoegen" (fase 3). Een `ui.date()` per rij in een
+  tabel met meerdere seizoenen zou visueel zwaar worden; voor een kalenderpicker per
+  losstaande actie (één keer een datum kiezen) is dat geen probleem, voor een compacte
+  herhalende lijst wel. Validatie gebeurt bij het verlaten van het veld (`blur`), met een
+  duidelijke foutmelding bij een onleesbare datum in plaats van een gok.
