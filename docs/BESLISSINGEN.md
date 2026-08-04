@@ -97,3 +97,62 @@ eerdere keuze kan een latere fase raken.
   scheelt een tweede implementatie van dezelfde flow; van project wisselen kost nu twee
   klikken (Sluiten, dan Nieuw/Openen) in plaats van één. Kan later worden toegevoegd als het
   in de praktijk irritant blijkt.
+
+## 2026-08-04 — Fase 3
+
+- **`ui/lesbewerkingen.py` toegevoegd** (niet met naam genoemd in DESIGN.md §7): alle
+  mutatielogica voor een les (toewijzen/vastzetten/wissen/vervallen/tijd/titel/extra les) in
+  één UI-onafhankelijke module met pure functies, gescheiden van `planning_view.py` (dat
+  alleen de NiceGUI-elementen bouwt en de klikhandlers aanroept). Dit maakt de mutatielogica
+  met gewone pytest-tests te toetsen zonder een browser of event loop nodig te hebben --
+  `tests/test_lesbewerkingen.py` en `tests/test_integratie_handmatig_rooster.py` doen dat.
+- **"Klik op lege dag in de kalender" is een "+ Extra les toevoegen"-knop geworden**,
+  in plaats van een klikbare lege cel in een maandkalender. Onze planning-weergave is een
+  chronologische lijst van bestaande/gegenereerde lessen (zoals de oude AG Grid-tabel), geen
+  maandraster met lege cellen -- die bestaan simpelweg niet als element om op te klikken.
+  Een knop met een datumkiezer in een dialoog levert dezelfde functionaliteit (ad-hoc les
+  toevoegen) zonder een volledige maandkalender-weergave te bouwen, wat buiten de scope van
+  deze fase valt.
+- **Toewijzen via een slot-knop + menu, niet via drag&drop.** DESIGN.md §4.7 noemt dit al
+  expliciet als voorkeur ("Slepen is later eventueel een toevoeging, maar klikken is
+  nauwkeuriger"), hier concreet uitgevoerd: elk lesgever-slot is een `ui.button` die een
+  `ui.menu` opent met alle actieve lesgevers (alfabetisch, met hun huidige aantal lessen),
+  plus vastzetten/losmaken/wissen als het slot al bezet is. Het menu wordt bij elke
+  `ververs()` opnieuw opgebouwd (`menu.clear()` + hervullen) in plaats van eenmalig, zodat de
+  lesgever-lijst en hun lessen-aantal altijd actueel zijn zonder een apart 'on show'-event te
+  gebruiken.
+  - **Dubbele toewijzing wordt geweigerd** (`wijs_lesgever_toe` geeft `False` terug zonder te
+    muteren): dezelfde lesgever twee keer op dezelfde les is nooit de bedoeling en zou ook
+    een onzinnige undo-entry opleveren.
+  - **Een klik op een leeg slot voegt altijd toe aan het EIND van `toewijzingen`**, nooit op
+    een specifieke index met gaten. Omdat de UI bezette slots altijd vooraan toont
+    (slot i is bezet ⟺ i < len(toewijzingen)), is "klik op leeg slot i" altijd gelijk aan
+    "voeg toe aan het eind" -- er zijn nooit gaten om te vullen.
+  - **Vervallen wist de toewijzingen** (`markeer_vervallen`): een les die niet doorgaat heeft
+    geen echte lesgever-indeling meer nodig. Bij "gaat weer door" blijft de lijst leeg (de
+    gebruiker wijst opnieuw toe), in plaats van te proberen de oude indeling te onthouden --
+    die was toch al gewist en zou een verrassende geest-toewijzing zijn.
+- **Async klikhandlers direct als `async def`-methoden**, niet via een `ui.timer(0, ..., once=True)`-omweg. NiceGUI's `handle_event()` await't automatisch een Awaitable die een
+  handler teruggeeft (ook via een lambda die een coroutine-aanroep retourneert), dus
+  `on_click=lambda: self._klik_vervalt()` met `_klik_vervalt` als `async def` volstaat. Dit
+  bleek pas na het lezen van `nicegui/events.py` broncode; eerdere pogingen gebruikten
+  onnodig een timer-omweg die is teruggedraaid.
+- **Undo/redo-tooltips tonen de eerstvolgende beschrijving** via twee nieuwe peek-methoden op
+  `Document` (`volgende_undo_beschrijving()` / `volgende_redo_beschrijving()`), niet met naam
+  genoemd in DESIGN.md maar nodig om PLAN.md fase 3's "undo/redo-knoppen met de beschrijving
+  als tooltip" te kunnen bouwen zonder de stack te muteren. Een `ui.tooltip()` wordt EENMAAL
+  als kind-element aangemaakt en daarna via `.set_text()` bijgewerkt -- `.tooltip(text)`
+  opnieuw aanroepen zou telkens een nieuw `Tooltip`-element toevoegen (gecontroleerd in de
+  nicegui-broncode).
+- **Geen geautomatiseerde klik-simulatie in de testsuite.** NiceGUI heeft een
+  `nicegui.testing.User`-simulator die zonder browser kliks/type-acties kan afspelen. Een
+  losse (niet-gecommitte) verkenning liep vast op een niet voor de hand liggende eis: de
+  `root=`-parameter van `user_simulation()` verwacht een functie die ZELF de paginainhoud
+  bouwt (zoals bij `ui.run(lambda: ...)`), niet een losse setup-functie die een module
+  importeert die op zijn beurt zelf `@ui.page("/")` registreert -- dat gaf een verwarrende
+  404-in-een-lus. De juiste weg is `main_file=` naar een los script te wijzen (zoals de
+  pytest-plugin van nicegui zelf doet). Gezien DESIGN.md §8 al expliciet "Geen UI-tests"
+  vastlegt, is hier niet verder in geïnvesteerd; correctheid is in plaats daarvan geverifieerd
+  met (a) volledige pytest-dekking van `lesbewerkingen.py` inclusief een save/reopen
+  integratietest, en (b) handmatige HTTP-smoke-tests die de pagina renderen met elke
+  lesstatus (gewoon, vast toegewezen, vervallen, extra) om constructiefouten te vangen.

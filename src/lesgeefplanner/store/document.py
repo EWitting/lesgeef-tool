@@ -118,6 +118,14 @@ class Document:
     def kan_opnieuw(self) -> bool:
         return bool(self._redo_stack)
 
+    def volgende_undo_beschrijving(self) -> str | None:
+        """Beschrijving van de mutatie die `ongedaan_maken()` zou ongedaan maken, zonder de
+        stack te wijzigen. Voor tooltips."""
+        return self._undo_stack[-1][0] if self._undo_stack else None
+
+    def volgende_redo_beschrijving(self) -> str | None:
+        return self._redo_stack[-1][0] if self._redo_stack else None
+
     def autosave_indien_nodig(
         self, interval_seconden: float = AUTOSAVE_INTERVAL_SECONDEN
     ) -> bool:

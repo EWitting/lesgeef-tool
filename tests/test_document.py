@@ -48,6 +48,18 @@ def test_undo_stack_max_50():
     assert len(doc.project.lesgevers) == 51
 
 
+def test_undo_redo_beschrijving_peek():
+    doc = Document.nieuw("Testjaar")
+    assert doc.volgende_undo_beschrijving() is None
+    with doc.muteer("Lesgever toegevoegd"):
+        doc.project.lesgevers.append(Lesgever(naam="Anne"))
+    assert doc.volgende_undo_beschrijving() == "Lesgever toegevoegd"
+    assert doc.volgende_redo_beschrijving() is None
+    doc.ongedaan_maken()
+    assert doc.volgende_undo_beschrijving() is None
+    assert doc.volgende_redo_beschrijving() == "Lesgever toegevoegd"
+
+
 def test_redo_stack_geleegd_na_nieuwe_mutatie():
     doc = Document.nieuw("Testjaar")
     with doc.muteer("eerste"):

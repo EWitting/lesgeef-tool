@@ -69,9 +69,13 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             undo_btn = ui.button(icon="undo", on_click=lambda: _ongedaan_maken()).props(
                 "flat color=white dense"
             )
+            with undo_btn:
+                undo_tooltip = ui.tooltip("Ongedaan maken (Ctrl+Z)")
             redo_btn = ui.button(icon="redo", on_click=lambda: _opnieuw()).props(
                 "flat color=white dense"
             )
+            with redo_btn:
+                redo_tooltip = ui.tooltip("Opnieuw uitvoeren (Ctrl+Y)")
             ui.button(
                 "Opslaan", icon="save", on_click=lambda: _opslaan()
             ).props("flat color=white dense")
@@ -94,7 +98,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             "flex: 1; height: calc(100vh - 56px); overflow-y: auto; padding: 0; margin: 0; "
             "min-width: 0;"
         ) as midden_paneel:
-            planning_view = PlanningView(midden_paneel)
+            planning_view = PlanningView(midden_paneel, on_wijziging_header=lambda: ververs_header())
             planning_view.rebuild()
 
         with ui.column().style(
@@ -110,8 +114,18 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         projectnaam_label.set_text(state.doc.project.naam)
         opgeslagen_label.set_text("Niet opgeslagen" if state.doc.gewijzigd else "Opgeslagen")
         peildatum_label.set_text(f"Peildatum: {format_datum_lang(state.peildatum())}")
-        undo_btn.props(remove="disable", add="disable" if not state.doc.kan_ongedaan_maken() else "")
-        redo_btn.props(remove="disable", add="disable" if not state.doc.kan_opnieuw() else "")
+
+        volgende_undo = state.doc.volgende_undo_beschrijving()
+        undo_btn.props(remove="disable", add="disable" if volgende_undo is None else "")
+        undo_tooltip.set_text(
+            f"Ongedaan maken: {volgende_undo} (Ctrl+Z)" if volgende_undo else "Niets om ongedaan te maken"
+        )
+
+        volgende_redo = state.doc.volgende_redo_beschrijving()
+        redo_btn.props(remove="disable", add="disable" if volgende_redo is None else "")
+        redo_tooltip.set_text(
+            f"Opnieuw uitvoeren: {volgende_redo} (Ctrl+Y)" if volgende_redo else "Niets om opnieuw te doen"
+        )
 
     def _ongedaan_maken() -> None:
         assert state.doc is not None
@@ -168,6 +182,16 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                 ).props("color=primary")
         resultaat = await dialoog
         return Path(resultaat) if resultaat else None
+
+    def _op_toets(e) -> None:
+        if not e.action.keydown or not e.modifiers.ctrl or e.modifiers.shift:
+            return
+        if e.key == "z":
+            _ongedaan_maken()
+        elif e.key == "y":
+            _opnieuw()
+
+    ui.keyboard(on_key=_op_toets)
 
     state.on_change(lambda: (planning_view.rebuild(), ververs_header()))
     ververs_header()
