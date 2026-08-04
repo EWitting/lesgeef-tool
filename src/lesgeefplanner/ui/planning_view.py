@@ -6,15 +6,18 @@ dat was precies het probleem met de oude AG Grid-integratie. Roep `rebuild()` da
 aan na een gewone celwijziging (alleen bij het wisselen van project of scope)."""
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import Callable
 
 from nicegui import ui
 
 from ..domain.formatting import format_datum, format_datum_lang, format_tijd, format_tijdvak
-from ..model.entities import Les
+from ..model.entities import Les, les_seizoen_id
 from ..model.project import Project
+from ..planner import bouw_request, los_op
 from . import lesbewerkingen as lb
+from .dialogen.diff_dialoog import DiffRegel, toon_diff_dialoog
 from .state import state
 
 _WEEK_GRENS_STIJL = "border-top: 2px solid #7a9cc4;"
@@ -263,9 +266,14 @@ class PlanningView:
         self._rows.clear()
 
         with self._container:
-            ui.button(
-                "+ Extra les toevoegen", icon="add", on_click=self._klik_extra_les_toevoegen
-            ).props("flat dense color=primary").classes("q-mb-xs")
+            with ui.row().classes("q-gutter-sm q-mb-xs items-center"):
+                ui.button(
+                    "+ Extra les toevoegen", icon="add", on_click=self._klik_extra_les_toevoegen
+                ).props("flat dense color=primary")
+                ui.button(
+                    "Automatisch invullen", icon="auto_fix_high",
+                    on_click=self._klik_automatisch_invullen,
+                ).props("dense color=primary")
 
         if state.doc is None:
             with self._container:
@@ -291,7 +299,7 @@ class PlanningView:
 
         with self._container:
             for les in lessen:
-                seizoen_id = les.herkomst.seizoen_id if les.herkomst else les.seizoen_id
+                seizoen_id = les_seizoen_id(les)
                 if seizoen_id != vorige_seizoen_id:
                     naam = seizoen_naam.get(seizoen_id, "Overig")
                     ui.label(naam).classes(
@@ -382,3 +390,75 @@ class PlanningView:
         ui.notify(f"Extra les toegevoegd op {format_datum_lang(datum_waarde)}.", type="positive")
         self.rebuild()
         self._on_wijziging_header()
+
+    async def _klik_automatisch_invullen(self) -> None:
+        """Lost de huidige scope op met de solver en toont het resultaat als een
+        voorstel-diff die de gebruiker per les moet bevestigen -- de solver zelf muteert
+        niets (docs/DESIGN.md §4.2)."""
+        if state.doc is None:
+            return
+        project = state.doc.project
+        scope = state.scope
+        peildatum = state.peildatum()
+
+        request = bouw_request(project, scope, peildatum)
+        if not request.lessen_in_scope:
+            ui.notify("Geen lessen in de huidige scope om automatisch in te vullen.", type="warning")
+            return
+
+        melding = ui.notification(
+            "Solver bezig...", spinner=True, timeout=None, type="ongoing"
+        )
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, los_op, request)
+        finally:
+            melding.dismiss()
+
+        if result.status == "onhaalbaar":
+            ui.notify(
+                "Geen haalbare oplossing gevonden. Controleer de beschikbaarheid en het "
+                "minimum/maximum aantal lesgevers per les in de configuratie.",
+                type="negative",
+                multi_line=True,
+            )
+            return
+        if not result.minimum_afgedwongen:
+            ui.notify(
+                "Let op: voor sommige lessen kon het minimum aantal lesgevers niet gehaald "
+                "worden. Bekijk het voorstel voor details.",
+                type="warning",
+                multi_line=True,
+            )
+
+        lesgever_naam = {lg.id: lg.naam for lg in project.lesgevers}
+        les_by_id = {les.id: les for les in request.lessen_in_scope}
+        regels: list[DiffRegel] = []
+        for les_id, nieuwe_ids in result.toewijzingen.items():
+            les = les_by_id[les_id]
+            oude_ids = [tw.lesgever_id for tw in les.toewijzingen]
+            if set(nieuwe_ids) == set(oude_ids):
+                continue
+            oud_tekst = ", ".join(lesgever_naam.get(i, "? (onbekend)") for i in oude_ids) or "leeg"
+            nieuw_tekst = ", ".join(lesgever_naam.get(i, "? (onbekend)") for i in nieuwe_ids) or "leeg"
+            regels.append(
+                DiffRegel(
+                    id=les_id,
+                    omschrijving=f"{format_datum(les.datum)} {format_tijd(les.begin_tijd)}: "
+                    f"{oud_tekst} → {nieuw_tekst}",
+                )
+            )
+        regels.sort(key=lambda r: les_by_id[r.id].datum)
+
+        gekozen = await toon_diff_dialoog(
+            f"Voorstel automatisch invullen ({len(regels)} lessen gewijzigd)",
+            regels,
+            toepassen_label="Toepassen",
+        )
+        if gekozen is None:
+            return
+
+        lb.pas_solverresultaat_toe(gekozen, result.toewijzingen)
+        self.rebuild()
+        self._on_wijziging_header()
+        ui.notify(f"{len(gekozen)} lessen bijgewerkt.", type="positive")

@@ -147,3 +147,44 @@ def test_aantal_lessen_voor_telt_alleen_doorgaande_lessen(state):
     lb.markeer_vervallen(les2_id, "Afgelast")
 
     assert lb.aantal_lessen_voor(state.doc.project, lg) == 1
+
+
+def test_pas_solverresultaat_toe_behoudt_vaste_toewijzingen(state):
+    les_id = _voeg_les_toe(state)
+    anne = _voeg_lesgever_toe(state, "Anne")
+    bob = _voeg_lesgever_toe(state, "Bob")
+    # Anne staat al vast (bv. handmatig ingedeeld voordat de solver draaide).
+    lb.wijs_lesgever_toe(les_id, 0, anne)
+
+    lb.pas_solverresultaat_toe({les_id}, {les_id: [anne, bob]})
+
+    les = lb.vind_les(state.doc.project, les_id)
+    namen_vast = {tw.lesgever_id: tw.vast for tw in les.toewijzingen}
+    bronnen = {tw.lesgever_id: tw.bron for tw in les.toewijzingen}
+    assert namen_vast == {anne: True, bob: False}
+    assert bronnen == {anne: "handmatig", bob: "solver"}
+
+
+def test_pas_solverresultaat_toe_raakt_niet_aangevinkte_lessen_niet_aan(state):
+    les1 = _voeg_les_toe(state)
+    les2 = lb.voeg_extra_les_toe(date(2026, 4, 25), time(10, 0), time(12, 0), "X")
+    lg = _voeg_lesgever_toe(state)
+
+    lb.pas_solverresultaat_toe({les1}, {les1: [lg], les2: [lg]})
+
+    assert lb.vind_les(state.doc.project, les1).toewijzingen[0].lesgever_id == lg
+    assert lb.vind_les(state.doc.project, les2).toewijzingen == []
+
+
+def test_pas_solverresultaat_toe_vervangt_niet_vaste_toewijzing(state):
+    les_id = _voeg_les_toe(state)
+    anne = _voeg_lesgever_toe(state, "Anne")
+    bob = _voeg_lesgever_toe(state, "Bob")
+    lb.wijs_lesgever_toe(les_id, 0, anne)
+    lb.wissel_vast(les_id, 0)  # Anne staat er niet-vast (bv. eerder solvervoorstel)
+
+    lb.pas_solverresultaat_toe({les_id}, {les_id: [bob]})
+
+    les = lb.vind_les(state.doc.project, les_id)
+    assert [tw.lesgever_id for tw in les.toewijzingen] == [bob]
+    assert les.toewijzingen[0].bron == "solver"

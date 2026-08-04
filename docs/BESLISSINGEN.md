@@ -156,3 +156,53 @@ eerdere keuze kan een latere fase raken.
   met (a) volledige pytest-dekking van `lesbewerkingen.py` inclusief een save/reopen
   integratietest, en (b) handmatige HTTP-smoke-tests die de pagina renderen met elke
   lesstatus (gewoon, vast toegewezen, vervallen, extra) om constructiefouten te vangen.
+
+## 2026-08-04 — Fase 4
+
+- **`les_seizoen_id(les)` verplaatst naar `model/entities.py`** als losse functie naast
+  `Les`, en hergebruikt in zowel `ui/planning_view.py` (groepering) als
+  `planner/request.py` / `planner/solve.py` (scope-splitsing, werkverdeling per seizoen).
+  Was eerst inline gedupliceerd in `planning_view.py`; nu één definitie. Niet expliciet zo
+  benoemd in DESIGN.md, maar wel de voor de hand liggende plek (bij het model, niet bij een
+  van de gebruikers ervan).
+- **`TermCollector.per_les()` beperkt tot les-gebonden termen** (tekort, bezetting_bonus,
+  misschien, geen_ervaren, wijziging). Week-conflict en boven/onder-richtlijn zijn
+  eigenschappen van een LESGEVER over meerdere lessen heen, niet van één les, en horen
+  daarom thuis in de per-persoon-weergave die fase 5 bouwt (het inspectiepaneel), niet in
+  `per_les`. DESIGN.md liet dit in het midden ("per les: verzamel de termen die aan die
+  les_id hangen") -- deze knip is een concrete invulling die bewaakt dat een uitleg-regel
+  altijd eenduidig bij één les OF één persoon hoort.
+- **Optimalisatie in de werkverdeling-termen**: een boven/onder-richtlijn-niveau wordt
+  alleen aangemaakt als het structureel haalbaar is (`drempel <= bovengrens` resp.
+  `drempel >= 0`), met een `break` zodra dat niet meer zo is. Dit verandert het gedrag niet
+  (de solver zou een onhaalbaar niveau toch altijd op 0/false zetten, want er is geen
+  constraint die het dwingt te activeren) maar scheelt onnodige BoolVars bij een kleine
+  scope. Niet in DESIGN.md's pseudocode opgenomen; hier expliciet vermeld omdat het afwijkt
+  van de letterlijke overname van het oude `src/schedule.py`.
+- **`_verzamel_beschikbaarheid()` in `planner/request.py`**: rondes worden gesorteerd op
+  `aangemaakt_op` en latere rondes overschrijven eerdere antwoorden voor hetzelfde
+  (lesgever, les)-paar ("nieuwste ronde wint"). DESIGN.md specificeert dit niet expliciet
+  voor de solver-kant (wel impliciet via `Ronde`/`Antwoord` in §3.5); dit is de concrete
+  keuze. `Antwoord.doet_mee=False` (screeningvraag, fase 6) sluit iemand nu al volledig uit
+  van beschikbaarheid, ook al bestaat de vraag zelf nog niet in de UI.
+- **`ui/dialogen/diff_dialoog.py` gebouwd als eerste van drie geplande toepassingen**
+  (solvervoorstel nu; kalenderdiff fase 8 en Excel-samenvoeging fase 7 hergebruiken hem
+  straks). Vorm: lijst met vinkjes (`DiffRegel`), "Alles aan/uit", Toepassen/Annuleren,
+  geeft de aangevinkte id's terug. Geen enkele fase-4-specifieke aanname erin verwerkt.
+- **Solvertoepassing is gesplitst in een testbare functie**: `lesbewerkingen.py` kreeg
+  `pas_solverresultaat_toe(les_ids, toewijzingen)` in plaats van de mutatielogica alleen in
+  de klik-handler van `planning_view.py` te schrijven. Reden: een bug hier (bv. een vaste
+  toewijzing per ongeluk overschrijven met `vast=False`) is precies het soort fout dat het
+  vertrouwen in "automatisch invullen" om zeep helpt, dus verdient een directe pytest-test
+  in plaats van alleen een smoke-test. `tests/test_lesbewerkingen.py` bevat nu drie tests
+  hiervoor, inclusief de expliciete regressietest dat een vaste toewijzing zijn
+  `vast=True`/`bron` behoudt na een solver-run.
+- **"Automatisch invullen" gebruikt nu al `state.scope`/`state.peildatum()`**, ook al is er
+  nog geen UI om de scope zichtbaar te wijzigen (dat komt met de scope-band uit DESIGN.md
+  §2.4, nog niet ingepland in een specifieke fase). Standaard is dus: hele project,
+  `alleen_toekomst=True`, peildatum = vandaag. Werkt voor nu correct maar is nog niet
+  door de gebruiker aan te passen; op te pakken zodra scope-UI concreet wordt.
+- **Solver draait via `loop.run_in_executor(None, los_op, request)`** met een
+  `ui.notification(spinner=True, timeout=None)` die na afloop wordt gedismisst. Voorkomt
+  dat de NiceGUI-eventloop blokkeert tijdens de (tot `max_rekentijd_seconden`) durende
+  CP-SAT-solve.

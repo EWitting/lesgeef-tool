@@ -76,3 +76,10 @@ class Les(BaseModel):
     beschermd: bool = False
     toewijzingen: list[Toewijzing] = []
     notitie: str = ""
+
+
+def les_seizoen_id(les: Les) -> str | None:
+    """Het seizoen dat bij deze les hoort: uit herkomst als de les gegenereerd is (die is
+    leidend, ook als seizoen_id later handmatig zou afwijken), anders het handmatig gezette
+    seizoen_id. None als de les bij geen enkel seizoen hoort."""
+    return les.herkomst.seizoen_id if les.herkomst is not None else les.seizoen_id

@@ -147,3 +147,30 @@ def voeg_extra_les_toe(datum: date, begin_tijd: time, eind_tijd: time, titel: st
     with state.doc.muteer("Extra les toegevoegd"):
         state.doc.project.lessen.append(nieuwe_les)
     return nieuwe_les.id
+
+
+def pas_solverresultaat_toe(les_ids: set[str], toewijzingen: dict[str, list[str]]) -> None:
+    """Past een solvervoorstel (docs/DESIGN.md §4.2) toe op de aangevinkte lessen.
+
+    Vaste toewijzingen die de solver al als harde constraint respecteerde, blijven
+    ongewijzigd staan (vast=True, hun eigen bron) -- ze zijn immers een bewuste keuze van de
+    gebruiker, geen solvervoorstel. Nieuw gekozen lesgevers krijgen vast=False,
+    bron='solver'. Lessen die niet in `les_ids` zitten worden niet aangeraakt."""
+    assert state.doc is not None
+    with state.doc.muteer("Automatisch ingevuld"):
+        project = state.doc.project
+        for les_id in les_ids:
+            les = vind_les(project, les_id)
+            if les is None:
+                continue
+            bestaand_per_lesgever = {tw.lesgever_id: tw for tw in les.toewijzingen}
+            nieuwe_toewijzingen = []
+            for lesgever_id in toewijzingen.get(les_id, []):
+                bestaand = bestaand_per_lesgever.get(lesgever_id)
+                if bestaand is not None and bestaand.vast:
+                    nieuwe_toewijzingen.append(bestaand)
+                else:
+                    nieuwe_toewijzingen.append(
+                        Toewijzing(lesgever_id=lesgever_id, vast=False, bron="solver")
+                    )
+            les.toewijzingen = nieuwe_toewijzingen
