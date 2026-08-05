@@ -64,7 +64,12 @@ class LessonRow:
         self._week_grens_stijl = _WEEK_GRENS_STIJL if nieuwe_week else _GEEN_WEEK_GRENS_STIJL
 
         with container:
-            with ui.row().classes("items-center q-px-sm").style(
+            # full-width: zonder dit neemt de rij alleen de breedte van zijn eigen inhoud
+            # in (een q-row rekt van zichzelf niet uit), en verschilt de breedte per rij
+            # net zo veel als het aantal getoonde slots (0 bij een vervallen les, anders
+            # het maximum) -- dat gaf zowel een onbedoelde witruimte rechts van de tabel
+            # als een rafelige rand tussen rijen onderling.
+            with ui.row().classes("items-center q-px-sm full-width").style(
                 "flex-wrap: nowrap; min-height: 32px;" + self._week_grens_stijl
             ) as self.root:
                 with ui.row().classes("items-center cursor-pointer").style(
@@ -86,7 +91,12 @@ class LessonRow:
                 self.slot_knoppen: list[ui.button] = []
                 self.slot_menus: list[ui.menu] = []
 
-                self.acties_btn = ui.button(icon="more_vert").props("flat dense size=sm")
+                # margin-left: auto duwt de acties-knop altijd naar de rechterrand van de
+                # (nu full-width) rij, ongeacht hoeveel slot-knoppen ervoor staan -- zo
+                # eindigt elke rij op dezelfde plek in plaats van direct na de laatste slot.
+                self.acties_btn = ui.button(icon="more_vert").props("flat dense size=sm").style(
+                    "margin-left: auto;"
+                )
                 with self.acties_btn:
                     self.acties_menu = ui.menu()
 
@@ -364,7 +374,7 @@ class PlanningView:
         if not lessen:
             with self._container:
                 ui.label(
-                    "Nog geen lessen. Stel eerst seizoenen en een weekrooster in."
+                    "Nog geen lessen. Stel eerst lessenreeksen en een weekrooster in."
                 ).classes("text-grey-6 q-pa-md")
             return
 
@@ -434,7 +444,13 @@ class PlanningView:
     def _na_wijziging(self, les_id: str) -> None:
         """Ververst deze les plus alle andere lessen in dezelfde ISO-week (bv. voor
         weekconflict-signalering, zie docs/PLAN.md fase 5), en meldt de header zodat de
-        "niet opgeslagen"-indicator en undo/redo-knoppen meteen kloppen."""
+        "niet opgeslagen"-indicator en undo/redo-knoppen meteen kloppen.
+
+        Maakt ook het laatste solver-resultaat ongeldig: een handmatige wijziging (hier,
+        niet via _klik_automatisch_invullen) maakt de oude score-opbouw ("Waarom deze
+        score?") niet meer kloppend met de werkelijke toewijzingen, dus die moet niet
+        stiekem een verouderd getal blijven tonen."""
+        state.laatste_plan_result = None
         self._on_wijziging_header()
         if state.doc is None:
             return

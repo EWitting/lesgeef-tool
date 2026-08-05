@@ -19,7 +19,7 @@ def voeg_lesgever_toe(naam: str) -> str:
 def wijzig_lesgever(
     lesgever_id: str,
     naam: str | None = None,
-    ervaring_jaren: int | None = None,
+    ervaren: bool | None = None,
     actief: bool | None = None,
 ) -> None:
     assert state.doc is not None
@@ -31,8 +31,8 @@ def wijzig_lesgever(
             return
         if naam is not None and naam.strip():
             lesgever.naam = naam.strip()
-        if ervaring_jaren is not None:
-            lesgever.ervaring_jaren = ervaring_jaren
+        if ervaren is not None:
+            lesgever.ervaren = ervaren
         if actief is not None:
             lesgever.actief = actief
 
@@ -64,7 +64,7 @@ def samenvoeg_geimporteerde_lesgevers(geimporteerd: list[Lesgever]) -> int:
         for nieuw in geimporteerd:
             bestaand = bestaand_by_naam.get(nieuw.naam)
             if bestaand is not None:
-                bestaand.ervaring_jaren = nieuw.ervaring_jaren
+                bestaand.ervaren = nieuw.ervaren
                 bestaand.actief = nieuw.actief
             else:
                 project.lesgevers.append(nieuw)

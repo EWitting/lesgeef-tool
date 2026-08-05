@@ -13,7 +13,7 @@ from .state import state
 def voeg_seizoen_toe(naam: str, begin: date, eind: date) -> str:
     assert state.doc is not None
     seizoen = Seizoen(naam=naam, begin=begin, eind=eind)
-    with state.doc.muteer(f"Seizoen '{naam}' toegevoegd"):
+    with state.doc.muteer(f"Lessenreeks '{naam}' toegevoegd"):
         state.doc.project.seizoenen.append(seizoen)
     return seizoen.id
 
@@ -25,7 +25,7 @@ def wijzig_seizoen(
     eind: date | None = None,
 ) -> None:
     assert state.doc is not None
-    with state.doc.muteer("Seizoen aangepast"):
+    with state.doc.muteer("Lessenreeks aangepast"):
         seizoen = _vind_seizoen(state.doc.project, seizoen_id)
         if seizoen is None:
             return
@@ -39,7 +39,7 @@ def wijzig_seizoen(
 
 def verwijder_seizoen(seizoen_id: str) -> None:
     assert state.doc is not None
-    with state.doc.muteer("Seizoen verwijderd"):
+    with state.doc.muteer("Lessenreeks verwijderd"):
         state.doc.project.seizoenen = [
             s for s in state.doc.project.seizoenen if s.id != seizoen_id
         ]

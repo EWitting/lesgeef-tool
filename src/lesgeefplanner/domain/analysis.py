@@ -89,7 +89,7 @@ def _analyseer_lessen(
             )
 
         if les.toewijzingen and not any(
-            lesgever_by_id[tw.lesgever_id].ervaring_jaren >= 1
+            lesgever_by_id[tw.lesgever_id].ervaren
             for tw in les.toewijzingen
             if tw.lesgever_id in lesgever_by_id
         ):
@@ -185,7 +185,7 @@ def _analyseer_werkverdeling(project: Project, seizoenen_in_scope: set) -> list[
                     Bevinding(
                         code="lesgever_boven_richtlijn", ernst="waarschuwing",
                         titel=f"{lg.naam}: boven de richtlijn ({totaal}/{doel})",
-                        uitleg=f"{lg.naam} staat op {totaal} lessen dit seizoen, "
+                        uitleg=f"{lg.naam} staat op {totaal} lessen deze lessenreeks, "
                         f"de richtlijn is {doel}.",
                         lesgever_id=lg.id, waarde=float(totaal),
                     )
@@ -195,7 +195,7 @@ def _analyseer_werkverdeling(project: Project, seizoenen_in_scope: set) -> list[
                     Bevinding(
                         code="lesgever_onder_richtlijn", ernst="info",
                         titel=f"{lg.naam}: onder de richtlijn ({totaal}/{doel})",
-                        uitleg=f"{lg.naam} staat op {totaal} lessen dit seizoen, "
+                        uitleg=f"{lg.naam} staat op {totaal} lessen deze lessenreeks, "
                         f"de richtlijn is {doel}.",
                         lesgever_id=lg.id, waarde=float(totaal),
                     )
@@ -238,7 +238,7 @@ def _analyseer_seizoenen_overlap(seizoenen: list[Seizoen]) -> list[Bevinding]:
                             f"'{s1.naam}' ({format_datum(s1.begin)}–{format_datum(s1.eind)}) "
                             f"en '{s2.naam}' ({format_datum(s2.begin)}–{format_datum(s2.eind)}) "
                             f"overlappen. Lessen op de overlappende data horen bij '{s1.naam}' "
-                            f"(het eerste seizoen in de lijst)."
+                            f"(de eerste lessenreeks in de lijst)."
                         ),
                     )
                 )
@@ -252,9 +252,9 @@ def _analyseer_les_buiten_seizoen(lessen: list[Les]) -> list[Bevinding]:
             resultaat.append(
                 Bevinding(
                     code="les_buiten_seizoen", ernst="info",
-                    titel=f"{format_datum(les.datum)}: geen seizoen",
-                    uitleg="Deze les hoort bij geen enkel seizoen (normaal voor een extra "
-                    "les zonder vast seizoen).",
+                    titel=f"{format_datum(les.datum)}: geen lessenreeks",
+                    uitleg="Deze les hoort bij geen enkele lessenreeks (normaal voor een "
+                    "extra les zonder vaste lessenreeks).",
                     les_id=les.id,
                 )
             )

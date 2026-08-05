@@ -47,7 +47,7 @@ def _open_dialoog() -> None:
         ui.label("Solver-instellingen").classes("text-subtitle1")
         ui.label(
             "Bepalen hoe 'Automatisch invullen' afweegt. De standaardwaarden zijn getuned "
-            "en werken voor de meeste seizoenen prima -- pas ze alleen aan als je weet wat "
+            "en werken voor de meeste lessenreeksen prima -- pas ze alleen aan als je weet wat "
             "je doet."
         ).classes("text-caption text-grey-7 q-mb-sm")
 

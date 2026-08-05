@@ -1,7 +1,7 @@
 """Tests voor de solver zelf (docs/DESIGN.md §8): vaste toewijzingen, context-tellingen voor
 weekconflict en werkverdeling, wijzigingskosten, dat verdeling optelt tot score, en
 determinisme."""
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from lesgeefplanner.model import Lesgever
 from lesgeefplanner.model.config import SolverConfig
@@ -29,6 +29,40 @@ def test_vaste_toewijzing_blijft_staan_ondanks_nee():
     result = los_op(request)
     assert result.status in ("optimaal", "haalbaar")
     assert "A" in result.toewijzingen[les.id]
+
+
+def test_bezetting_bonus_alleen_voor_lesgevers_boven_minimum():
+    """Regressietest: eerder kreeg ELKE niet-vaste toewijzing de volle bonus, ook de
+    toewijzing(en) die precies het minimum vulden -- bij lesgever_minimum=1 gaf dat -1
+    bonus per les zelfs met maar 1 (verplichte) lesgever, i.p.v. 0. Bonus hoort alleen te
+    gelden voor lesgevers BOVEN het minimum."""
+    lessen = [_les(date(2026, 4, 22) + timedelta(days=7 * i)) for i in range(3)]
+    lesgevers = [Lesgever(id="A", naam="A")]
+    config = SolverConfig(lesgever_minimum=1, lesgever_maximum=3, lesgever_bonus=1.0)
+    request = PlanRequest(
+        lessen_in_scope=lessen, lessen_context=[], lesgevers=lesgevers,
+        beschikbaarheid={("A", les.id): "ja" for les in lessen},
+        config=config, peildatum=date(2026, 1, 1),
+    )
+    result = los_op(request)
+    assert all(len(result.toewijzingen[les.id]) == 1 for les in lessen)
+    assert result.verdeling.get("bezetting_bonus", 0.0) == 0.0
+
+
+def test_bezetting_bonus_telt_alleen_lesgevers_boven_minimum_ook_bij_overschot():
+    """Met 4 beschikbare lesgevers, minimum=1, maximum=3: de bonus mag alleen de 2 extra's
+    (boven het minimum van 1) tellen, niet alle 3 toegewezen lesgevers."""
+    les = _les(date(2026, 4, 22))
+    lesgevers = [Lesgever(id=f"lg{i}", naam=f"Lg{i}") for i in range(4)]
+    config = SolverConfig(lesgever_minimum=1, lesgever_maximum=3, lesgever_bonus=2.0)
+    request = PlanRequest(
+        lessen_in_scope=[les], lessen_context=[], lesgevers=lesgevers,
+        beschikbaarheid={(lg.id, les.id): "ja" for lg in lesgevers},
+        config=config, peildatum=date(2026, 1, 1),
+    )
+    result = los_op(request)
+    assert len(result.toewijzingen[les.id]) == 3
+    assert result.verdeling["bezetting_bonus"] == -4.0  # 2 extra's * -2.0, niet 3 * -2.0
 
 
 def test_week_conflict_telt_context_mee():
@@ -155,7 +189,7 @@ def _scenario_klein() -> PlanRequest:
         _les(date(2026, 4, 22)), _les(date(2026, 4, 29)),
         _les(date(2026, 5, 6)), _les(date(2026, 5, 13)),
     ]
-    lesgevers = [Lesgever(id=f"lg{i}", naam=f"Lg{i}", ervaring_jaren=i % 2) for i in range(5)]
+    lesgevers = [Lesgever(id=f"lg{i}", naam=f"Lg{i}", ervaren=bool(i % 2)) for i in range(5)]
     beschikbaarheid = {}
     for i, lg in enumerate(lesgevers):
         for j, les in enumerate(lessen):

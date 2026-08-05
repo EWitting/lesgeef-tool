@@ -40,7 +40,7 @@ def test_les_te_weinig_lesgevers():
 
 def test_les_geen_ervaren_lesgever():
     project = Project(naam="T")
-    lg = Lesgever(naam="Anne", ervaring_jaren=0)
+    lg = Lesgever(naam="Anne", ervaren=False)
     project.lesgevers = [lg]
     project.solver_config.lesgever_minimum = 1
     project.lessen = [_les(date(2026, 4, 22), toewijzingen=[Toewijzing(lesgever_id=lg.id, vast=True)])]
@@ -172,7 +172,7 @@ def test_rapport_groepeert_op_ernst():
     project.lessen = [_les(date(2026, 4, 22))]
     bevindingen = analyseer(project, Scope(alleen_toekomst=False), PEILDATUM)
     tekst = genereer_tekstrapport(bevindingen)
-    assert "FOUTEN" in tekst
+    assert "PROBLEMEN" in tekst
     assert "niet ingevuld" in tekst
 
 

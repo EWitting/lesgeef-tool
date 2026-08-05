@@ -109,3 +109,19 @@ def test_migratie_te_nieuw_schema_geeft_nette_fout():
 def test_migratie_huidige_schema_ongewijzigd():
     data = {"schema_version": SCHEMA_VERSION, "naam": "X"}
     assert migreer(data) == data
+
+
+def test_migratie_1_naar_2_zet_ervaring_jaren_om_naar_ervaren():
+    data = {
+        "schema_version": 1, "naam": "X",
+        "lesgevers": [
+            {"id": "a", "naam": "Anne", "ervaring_jaren": 3, "actief": True},
+            {"id": "b", "naam": "Bob", "ervaring_jaren": 0, "actief": True},
+        ],
+    }
+    gemigreerd = migreer(data)
+    assert gemigreerd["schema_version"] == SCHEMA_VERSION
+    lesgevers = {lg["naam"]: lg for lg in gemigreerd["lesgevers"]}
+    assert lesgevers["Anne"]["ervaren"] is True
+    assert "ervaring_jaren" not in lesgevers["Anne"]
+    assert lesgevers["Bob"]["ervaren"] is False

@@ -12,7 +12,7 @@ def _project() -> tuple[Project, Les, Les]:
     project = Project(naam="Test")
     seizoen = Seizoen(naam="Voorseizoen 1", begin=date(2026, 4, 19), eind=date(2026, 5, 10))
     project.seizoenen = [seizoen]
-    lg = Lesgever(naam="Anne", ervaring_jaren=2)
+    lg = Lesgever(naam="Anne", ervaren=True)
     project.lesgevers = [lg]
 
     les1 = Les(
@@ -46,7 +46,7 @@ def test_export_header_rij(tmp_path: Path):
     ws = openpyxl.load_workbook(pad)["Planning"]
     header = [c.value for c in ws[1]]
     assert header[0] == "Code"
-    assert header[1] == "Seizoen"
+    assert header[1] == "Lessenreeks"
     assert "Lesgevers" in header
     assert header[-1] == "Info"
 

@@ -15,7 +15,9 @@ class Lesgever(BaseModel):
 
     id: str = Field(default_factory=nieuw_id)
     naam: str
-    ervaring_jaren: int = 0
+    # Was ooit een aantal jaren; de solver/analyse keek toch alleen naar >=1 jaar, dus is
+    # dat vereenvoudigd tot een simpele vlag (zie docs/BESLISSINGEN.md, "ervaren-vlag").
+    ervaren: bool = False
     actief: bool = True
     email: str | None = None
     notitie: str = ""

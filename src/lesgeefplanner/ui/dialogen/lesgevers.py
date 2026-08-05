@@ -14,8 +14,15 @@ from ..state import state
 from ..velden import bestand_upload
 
 _VELD_LABEL: dict[DoelVeld, str] = {
-    "naam": "Naam", "ervaring_jaren": "Ervaring (jaren)", "actief": "Actief",
+    "naam": "Naam", "ervaren": "Ervaren", "actief": "Actief",
 }
+
+# Gedeeld tussen de kopregel en elke lesgever-rij, zodat de "Ervaren"/"Actief"-kolommen
+# (nu allebei een vinkje) precies boven hun kopje uitlijnen -- zonder koppen was niet meer
+# te zien welk vinkje wat betekende.
+_NAAM_STIJL = "flex: 2 1 100px; min-width: 100px;"
+_VINKJE_KOLOM_STIJL = "width: 64px; flex-shrink: 0; display: flex; justify-content: center;"
+_ACTIE_KOLOM_STIJL = "width: 36px; flex-shrink: 0;"
 
 
 def create_lesgevers_paneel(container: ui.column) -> None:
@@ -28,7 +35,19 @@ def create_lesgevers_paneel(container: ui.column) -> None:
     with container:
         ui.label("Lesgevers").classes("text-subtitle1 q-mb-xs")
         lesgevers = sorted(state.doc.project.lesgevers, key=lambda l: l.naam.lower())
-        if not lesgevers:
+        if lesgevers:
+            with ui.row().classes("items-center full-width").style(
+                "flex-wrap: wrap; gap: 6px;"
+            ):
+                ui.label("Naam").classes("text-caption text-weight-bold").style(_NAAM_STIJL)
+                ui.label("Ervaren").classes(
+                    "text-caption text-weight-bold text-center"
+                ).style(_VINKJE_KOLOM_STIJL)
+                ui.label("Actief").classes(
+                    "text-caption text-weight-bold text-center"
+                ).style(_VINKJE_KOLOM_STIJL)
+                ui.element("div").style(_ACTIE_KOLOM_STIJL)
+        else:
             ui.label("Nog geen lesgevers.").classes("text-caption text-grey-6")
         for lg in lesgevers:
             _lesgever_rij(container, lg.id)
@@ -46,7 +65,7 @@ def create_lesgevers_paneel(container: ui.column) -> None:
         ui.separator().classes("q-my-sm")
         ui.label("Importeren uit Excel").classes("text-caption text-weight-bold")
         ui.label(
-            "Bestaande namen worden bijgewerkt (ervaring/actief); nieuwe namen toegevoegd."
+            "Bestaande namen worden bijgewerkt (ervaren/actief); nieuwe namen toegevoegd."
         ).classes("text-caption text-grey-7")
         bestand_upload(
             "Lesgevers .xlsx", ".xlsx,.xls", lambda e: _klik_upload(container, e),
@@ -68,9 +87,7 @@ def _lesgever_rij(container: ui.column, lesgever_id: str) -> None:
     if lg is None:
         return
     with ui.row().classes("items-center full-width").style("flex-wrap: wrap; gap: 6px;"):
-        naam_veld = ui.input(value=lg.naam).props("dense").style(
-            "flex: 2 1 100px; min-width: 100px;"
-        )
+        naam_veld = ui.input(value=lg.naam).props("dense").style(_NAAM_STIJL)
         naam_veld.on(
             "blur",
             lambda: (
@@ -78,26 +95,25 @@ def _lesgever_rij(container: ui.column, lesgever_id: str) -> None:
                 state.meld_wijziging(),
             ),
         )
-        ervaring_veld = ui.number(value=lg.ervaring_jaren, min=0, max=50).props(
-            "dense"
-        ).style("flex: 1 1 60px; min-width: 60px;").tooltip("Ervaring (jaren)")
-        ervaring_veld.on(
-            "blur",
-            lambda: (
-                lgb.wijzig_lesgever(lesgever_id, ervaring_jaren=int(ervaring_veld.value or 0)),
-                state.meld_wijziging(),
-            ),
-        )
-        ui.checkbox(
-            value=lg.actief,
-            on_change=lambda e: (
-                lgb.wijzig_lesgever(lesgever_id, actief=e.value),
-                state.meld_wijziging(),
-            ),
-        ).tooltip("Actief")
+        with ui.element("div").style(_VINKJE_KOLOM_STIJL):
+            ui.checkbox(
+                value=lg.ervaren,
+                on_change=lambda e: (
+                    lgb.wijzig_lesgever(lesgever_id, ervaren=e.value),
+                    state.meld_wijziging(),
+                ),
+            ).tooltip("Ervaren")
+        with ui.element("div").style(_VINKJE_KOLOM_STIJL):
+            ui.checkbox(
+                value=lg.actief,
+                on_change=lambda e: (
+                    lgb.wijzig_lesgever(lesgever_id, actief=e.value),
+                    state.meld_wijziging(),
+                ),
+            ).tooltip("Actief")
         ui.button(
             icon="delete", on_click=lambda: _klik_verwijderen(container, lesgever_id)
-        ).props("flat dense size=sm color=negative")
+        ).props("flat dense size=sm color=negative").style(_ACTIE_KOLOM_STIJL)
 
 
 def _klik_verwijderen(container: ui.column, lesgever_id: str) -> None:

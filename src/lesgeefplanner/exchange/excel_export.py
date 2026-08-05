@@ -72,7 +72,7 @@ def export_planning(project: Project, excel_pad: str | Path) -> None:
 
     header_format = workbook.add_format({"align": "center", "bold": True, "top": 2})
     worksheet.write_string(0, COL_CODE, "Code", header_format)
-    worksheet.write_string(0, COL_SEIZOEN, "Seizoen", header_format)
+    worksheet.write_string(0, COL_SEIZOEN, "Lessenreeks", header_format)
     worksheet.write_string(0, COL_WEEK, "Week", header_format)
     worksheet.write_string(0, COL_DATUM, "Datum", header_format)
     worksheet.write_string(0, COL_TIJD, "Tijd", header_format)

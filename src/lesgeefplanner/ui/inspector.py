@@ -22,7 +22,7 @@ from ..planner.terms import CATEGORIE_LABELS
 from .planning_view import PlanningView
 from .state import state
 
-_ERNST_LABEL = {"fout": "Fouten", "waarschuwing": "Waarschuwingen", "info": "Info"}
+_ERNST_LABEL = {"fout": "Problemen", "waarschuwing": "Waarschuwingen", "info": "Info"}
 _ERNST_ICOON = {"fout": "error", "waarschuwing": "warning", "info": "info"}
 _ERNST_KLEUR = {"fout": "text-red-8", "waarschuwing": "text-orange-8", "info": "text-blue-8"}
 _BESCHIKBAARHEID_LABEL = {"ja": "Ja", "misschien": "Misschien", "nee": "Nee"}
@@ -102,7 +102,7 @@ class Inspector:
 
     def _render_gezondheid(self, project, bevindingen: list[Bevinding]) -> None:
         with ui.row().classes("items-center justify-between full-width"):
-            ui.label("Status").classes("text-h6")
+            ui.label("Rooster status").classes("text-h6")
             ui.button(
                 icon="content_copy", on_click=lambda: self._kopieer_rapport(bevindingen)
             ).props("flat dense").tooltip("Kopieer rapport")
@@ -114,19 +114,20 @@ class Inspector:
                 groep = [b for b in bevindingen if b.ernst == ernst]
                 if not groep:
                     continue
-                with ui.row().classes("items-center q-gutter-xs q-mt-sm"):
-                    ui.icon(_ERNST_ICOON[ernst]).classes(_ERNST_KLEUR[ernst])
-                    ui.label(f"{_ERNST_LABEL[ernst]} ({len(groep)})").classes("text-weight-bold")
-                for b in groep:
-                    self._bevinding_regel(b)
+                with ui.expansion(
+                    f"{_ERNST_LABEL[ernst]} ({len(groep)})", icon=_ERNST_ICOON[ernst],
+                    value=True,
+                ).classes(f"full-width q-mt-sm {_ERNST_KLEUR[ernst]}"):
+                    for b in groep:
+                        self._bevinding_regel(b)
 
-        ui.separator().classes("q-my-md")
-        ui.label("Belasting per persoon").classes("text-subtitle2")
-        self._render_belasting(project)
+        with ui.expansion("Belasting per persoon", value=True).classes(
+            "full-width q-mt-md"
+        ):
+            self._render_belasting(project)
 
-        ui.separator().classes("q-my-md")
-        ui.label("Waarom deze score?").classes("text-subtitle2")
-        self._render_score_verdeling()
+        with ui.expansion("Waarom deze score?", value=True).classes("full-width q-mt-md"):
+            self._render_score_verdeling()
 
     def _bevinding_regel(self, b: Bevinding) -> None:
         with ui.row().classes("items-center cursor-pointer q-py-1 full-width").on(
@@ -157,7 +158,9 @@ class Inspector:
         per_seizoen = lessen_per_seizoen(project)
 
         gegevens: list[tuple[str, str, int, int]] = []
-        for lg in sorted((l for l in project.lesgevers if l.actief), key=lambda l: l.naam.lower()):
+        for lg in project.lesgevers:
+            if not lg.actief:
+                continue
             totaal = 0
             doel = 0
             for sleutel in seizoenen_in_scope:
@@ -170,11 +173,25 @@ class Inspector:
             ui.label("Geen actieve lesgevers.").classes("text-caption text-grey-6")
             return
 
+        # Hoogste belasting eerst -- wie het meest ingedeeld is, is doorgaans waar je als
+        # eerste naar wilt kijken; alfabetisch was hier geen zinvolle volgorde.
+        gegevens.sort(key=lambda g: (-g[2], g[0].lower()))
+
+        ui.label(
+            "Balk = toegewezen lessen, zwarte streep = evenredig verdeeld doel. "
+            "Rood = boven doel, blauw = onder doel, groen = op doel."
+        ).classes("text-caption text-grey-6 q-mb-xs")
+
         max_waarde = max((max(t, d) for _, _, t, d in gegevens), default=1) or 1
         for naam, lg_id, totaal, doel in gegevens:
-            with ui.row().classes("items-center cursor-pointer").style("gap: 6px;").on(
-                "click", lambda lg_id=lg_id: self.toon_lesgever(lg_id)
-            ):
+            # full-width: zonder dit krimpt de rij tot zijn eigen inhoud (de balk-div heeft
+            # zelf geen content, alleen absoluut gepositioneerde kinderen die niet meetellen
+            # voor de intrinsieke breedte), waardoor "flex: 1" niets heeft om in te groeien
+            # -- de balk werd dan onzichtbaar/nul breed en elke doel-streep viel op
+            # dezelfde plek, ongeacht ieders werkelijke doel.
+            with ui.row().classes("items-center cursor-pointer full-width").style(
+                "gap: 6px;"
+            ).on("click", lambda lg_id=lg_id: self.toon_lesgever(lg_id)):
                 ui.label(naam).classes("text-caption").style(
                     "width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
                 )
@@ -210,19 +227,25 @@ class Inspector:
         ui.label(f"Totale score: {result.score:.1f} ({result.status})").classes(
             "text-caption q-mb-xs"
         )
+        ui.label(
+            "Lager is beter (0 = geen strafpunten). Groen/negatief betekent hier juist "
+            "gunstig -- bv. bij 'Extra lesgever' is dat bonus die is toegekend, geen "
+            "probleem."
+        ).classes("text-caption text-grey-6 q-mb-xs")
         for categorie, bijdrage in sorted(result.verdeling.items(), key=lambda kv: -abs(kv[1])):
             if bijdrage == 0:
                 continue
+            kleur = "text-red-8" if bijdrage > 0 else "text-positive"
             with ui.row().classes("items-center justify-between full-width"):
                 ui.label(CATEGORIE_LABELS.get(categorie, categorie)).classes("text-caption")
-                ui.label(f"{bijdrage:+.1f}").classes("text-caption")
+                ui.label(f"{bijdrage:+.1f}").classes(f"text-caption text-weight-bold {kleur}")
 
     # ------------------------------------------------------------------
     # Stand 2: een les
     # ------------------------------------------------------------------
 
     def _render_les(self, project, les, bevindingen: list[Bevinding]) -> None:
-        ui.button("← Status", on_click=self.toon_gezondheid).props("flat dense no-caps")
+        ui.button("← Rooster status", on_click=self.toon_gezondheid).props("flat dense no-caps")
 
         ui.label(format_datum_lang(les.datum)).classes("text-h6")
         ui.label(format_tijdvak(les.begin_tijd, les.eind_tijd)).classes(
@@ -275,10 +298,12 @@ class Inspector:
     # ------------------------------------------------------------------
 
     def _render_lesgever(self, project, lesgever) -> None:
-        ui.button("← Status", on_click=self.toon_gezondheid).props("flat dense no-caps")
+        ui.button("← Rooster status", on_click=self.toon_gezondheid).props("flat dense no-caps")
 
         ui.label(lesgever.naam).classes("text-h6")
-        ui.label(f"Ervaring: {lesgever.ervaring_jaren} jaar").classes("text-caption text-grey-7")
+        ui.label("Ervaren" if lesgever.ervaren else "Nog niet ervaren").classes(
+            "text-caption text-grey-7"
+        )
 
         beschikbaarheid = verzamel_beschikbaarheid(project)
         tellingen = {"ja": 0, "misschien": 0, "nee": 0}
@@ -294,13 +319,13 @@ class Inspector:
         ).classes("text-caption text-grey-7")
 
         ui.separator().classes("q-my-sm")
-        ui.label("Belasting per seizoen").classes("text-subtitle2")
+        ui.label("Belasting per lessenreeks").classes("text-subtitle2")
         per_seizoen = lessen_per_seizoen(project)
         seizoen_naam = {s.id: s.naam for s in project.seizoenen}
         for sleutel, lessen in per_seizoen.items():
             totaal = totaal_voor_lesgever(lesgever.id, lessen)
             doel = doel_voor_seizoen(project, lessen)
-            naam = seizoen_naam.get(sleutel, "Geen seizoen")
+            naam = seizoen_naam.get(sleutel, "Geen lessenreeks")
             ui.label(f"{naam}: {totaal}/{doel}").classes("text-caption")
 
         ui.separator().classes("q-my-sm")

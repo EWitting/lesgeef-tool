@@ -116,16 +116,31 @@ def _maak_model(
             model.Add(tekort >= 0)
             termen.add("tekort", config.penalty_lesgever_tekort, tekort, les_id=les.id)
 
-    # Soft: liever meer lesgevers (niet voor vaste toewijzingen, die zijn al verplicht)
+    # Soft: liever meer lesgevers dan het minimum -- bewust alleen de lesgevers BOVEN het
+    # minimum verdienen bonus (vaste toewijzingen tellen niet mee, die zijn al verplicht).
+    # BUG (tot hier gefixed): eerder kreeg élke niet-vaste toewijzing de volle bonus, ook de
+    # toewijzing(en) die alleen het minimum vulden -- bij lesgever_minimum=1 gaf dat bv.
+    # -1 bonus per les zelfs als er maar precies 1 (verplichte) lesgever op stond, in
+    # plaats van 0. `extra` is dus max(0, aantal niet-vaste toewijzingen - wat daarvan nog
+    # nodig is om het minimum te halen), via AddMaxEquality zodat het nooit negatief kan
+    # worden (bv. bij een noodgedwongen tekort in de hard_min=False-poging).
     for les in lessen:
         vaste_ids = vaste_ids_per_les[les.id]
-        for lg in lesgevers:
-            key = (lg.id, les.id)
-            if key in assignments and lg.id not in vaste_ids:
-                termen.add(
-                    "bezetting_bonus", -config.lesgever_bonus, assignments[key],
-                    les_id=les.id, lesgever_id=lg.id,
-                )
+        niet_vaste_vars = [
+            assignments[(lg.id, les.id)] for lg in lesgevers
+            if (lg.id, les.id) in assignments and lg.id not in vaste_ids
+        ]
+        if not niet_vaste_vars:
+            continue
+        resterend_minimum = max(0, config.lesgever_minimum - len(vaste_ids))
+        werkelijk_extra = model.NewIntVar(
+            -resterend_minimum, len(niet_vaste_vars) - resterend_minimum,
+            f"werkelijk_extra_{les.id}",
+        )
+        model.Add(werkelijk_extra == sum(niet_vaste_vars) - resterend_minimum)
+        extra = model.NewIntVar(0, len(niet_vaste_vars), f"extra_{les.id}")
+        model.AddMaxEquality(extra, [werkelijk_extra, model.NewConstant(0)])
+        termen.add("bezetting_bonus", -config.lesgever_bonus, extra, les_id=les.id)
 
     # Soft: penalty per lesgever met "misschien" (niet voor vaste toewijzingen)
     for les in lessen:
@@ -143,7 +158,7 @@ def _maak_model(
     # Soft: penalty als geen ervaren lesgever is ingedeeld
     for les in lessen:
         heeft_al_ervaren_vast = any(
-            lesgever_by_id[lg_id].ervaring_jaren >= 1
+            lesgever_by_id[lg_id].ervaren
             for lg_id in vaste_ids_per_les[les.id]
             if lg_id in lesgever_by_id
         )
@@ -152,7 +167,7 @@ def _maak_model(
         ervaren_vars = [
             assignments[(lg.id, les.id)]
             for lg in lesgevers
-            if lg.ervaring_jaren >= 1 and (lg.id, les.id) in assignments
+            if lg.ervaren and (lg.id, les.id) in assignments
         ]
         if ervaren_vars:
             geen_ervaring = model.NewBoolVar(f"geen_ervaring_{les.id}")

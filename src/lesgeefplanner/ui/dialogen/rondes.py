@@ -28,14 +28,15 @@ def create_rondes_paneel(container: ui.column) -> None:
 
     with container:
         ui.label("Beschikbaarheidsrondes").classes("text-subtitle1 q-mb-xs")
-        _nieuwe_ronde_sectie(container)
-        ui.separator().classes("q-my-sm")
 
         project = state.doc.project
         if not project.rondes:
             ui.label("Nog geen rondes aangemaakt.").classes("text-caption text-grey-6")
         for ronde in sorted(project.rondes, key=lambda r: r.aangemaakt_op, reverse=True):
             _ronde_kaart(container, ronde.id)
+
+        ui.separator().classes("q-my-sm")
+        _nieuwe_ronde_sectie(container)
 
 
 def _nieuwe_ronde_sectie(container: ui.column) -> None:
@@ -112,20 +113,29 @@ def _ronde_kaart(container: ui.column, ronde_id: str) -> None:
                 _overzicht_sectie(ronde, actieve_lesgevers, nog_te_vullen)
 
 
+_FORMULIER_STAPPEN = [
+    "Ga naar script.google.com en maak een nieuw project.",
+    "Plak onderstaand script (vervang de bestaande inhoud).",
+    "Sla het script op (Ctrl+S) -- de knop 'Uitvoeren' werkt pas na opslaan.",
+    "Klik 'Uitvoeren' en kies de functie 'maakFormulier'.",
+    "Bekijk het log (Weergave → Logs) voor de link naar het formulier.",
+]
+
+
 def _formulier_sectie(ronde: Ronde) -> None:
     assert state.doc is not None
-    lesgevers = state.doc.project.lesgevers
+    project = state.doc.project
 
-    ui.label(
-        "1. Ga naar script.google.com en maak een nieuw project. "
-        "2. Plak onderstaand script (vervang de bestaande inhoud). "
-        "3. Klik 'Uitvoeren' en kies de functie 'maakFormulier'. "
-        "4. Bekijk het log (Weergave → Logs) voor de link naar het formulier."
-    ).classes("text-caption q-mb-xs")
+    with ui.column().classes("q-mb-xs").style("gap: 0;"):
+        for i, stap in enumerate(_FORMULIER_STAPPEN, start=1):
+            ui.label(f"{i}. {stap}").classes("text-caption")
 
-    script = genereer_apps_script(ronde, lesgevers)
+    script = genereer_apps_script(ronde, project)
+    # overflow-x: het script kan best breed worden (elke les-datum staat op zijn eigen
+    # regel in de rijen-array) -- horizontaal scrollen i.p.v. afkappen of de kaart uit
+    # elkaar duwen.
     ui.code(script, language="javascript").classes("full-width").style(
-        "max-height: 240px; overflow-y: auto;"
+        "max-height: 240px; overflow: auto; white-space: pre;"
     )
     ui.button(
         "Kopieer script", icon="content_copy",
@@ -134,13 +144,14 @@ def _formulier_sectie(ronde: Ronde) -> None:
 
     with ui.expansion("Handmatig alternatief").classes("full-width q-mt-sm"):
         ui.label(
-            "Maak zelf een formulier met een meerkeuzevraag 'Ja/Misschien/Nee' per regel "
-            "hieronder, en een 'Wie ben je?'-vraag met deze namen als opties. Laat de "
-            "'#nummer' aan het eind van elke vraagtitel staan."
+            "Maak zelf een formulier met een 'Meerkeuzerooster'-vraag (rij per les, "
+            "kolommen Ja/Misschien/Nee) met onderstaande regels als rijen, in deze "
+            "volgorde -- Lesgeefplanner koppelt antwoorden bij import op volgorde, niet "
+            "op de tekst zelf."
         ).classes("text-caption")
         labels = genereer_labellijst(ronde)
         ui.code(labels, language="text").classes("full-width").style(
-            "max-height: 160px; overflow-y: auto;"
+            "max-height: 160px; overflow: auto; white-space: pre;"
         )
         ui.button(
             "Kopieer lijst", icon="content_copy",
@@ -155,7 +166,9 @@ def _kopieer(tekst: str, melding: str) -> None:
 
 def _import_sectie(container: ui.column, ronde: Ronde) -> None:
     ui.label(
-        "Exporteer het antwoordenbestand via Google Forms → Reacties → xlsx exporteren."
+        "In het formulier: Reacties → klik het Sheets-icoontje om de antwoorden aan een "
+        "spreadsheet te koppelen. Open die spreadsheet en kies Bestand → Downloaden → "
+        "Microsoft Excel (.xlsx)."
     ).classes("text-caption q-mb-xs")
     bestand_upload(
         "Antwoorden .xlsx", ".xlsx,.xls", lambda e: _klik_upload(container, ronde.id, e),

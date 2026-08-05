@@ -1,6 +1,14 @@
 """Bestandskeuze: native OS-dialoog in de gepakte app, tekstveld-fallback in browsermodus
 (bv. tijdens ontwikkelen, waar geen pywebview-venster draait). Zie docs/BESLISSINGEN.md voor
-de afweging native-venster versus browsertab."""
+de afweging native-venster versus browsertab.
+
+BELANGRIJK: gebruik `webview.FileDialog.OPEN/SAVE` (een echte enum-waarde), NIET de oude
+`webview.OPEN_DIALOG`/`SAVE_DIALOG`-constanten -- die zijn in pywebview 6 vervangen door een
+deprecation-proxy die per aanroep een nieuw, niet-picklebaar object teruggeeft. Het native
+venster draait in een apart proces (multiprocessing), dus de dialoog-aanroep moet over een
+Queue gepickled worden; met de oude constanten crasht dat met "Can't pickle <function
+SAVE_DIALOG ...>: it's not the same object as webview.SAVE_DIALOG" en werkt opslaan/openen
+dus helemaal niet."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,7 +33,7 @@ async def kies_bestand_openen(bestandstypes: tuple[tuple[str, str], ...] = ()) -
 
     patronen = tuple(f"{label} ({patroon})" for label, patroon in bestandstypes)
     resultaat = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.OPEN_DIALOG, allow_multiple=False, file_types=patronen
+        dialog_type=webview.FileDialog.OPEN, allow_multiple=False, file_types=patronen
     )
     if not resultaat:
         return None
@@ -38,7 +46,7 @@ async def kies_bestand_opslaan(standaardnaam: str) -> Path | None:
     import webview
 
     resultaat = await app.native.main_window.create_file_dialog(
-        dialog_type=webview.SAVE_DIALOG, save_filename=standaardnaam
+        dialog_type=webview.FileDialog.SAVE, save_filename=standaardnaam
     )
     if not resultaat:
         return None

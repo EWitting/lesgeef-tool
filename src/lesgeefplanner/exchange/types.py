@@ -15,6 +15,9 @@ class GekoppeldAntwoord:
     lesgever_id: str
     waarden: dict[str, Antwoordwaarde] = field(default_factory=dict)  # les_id -> waarde
     ingevuld_op: datetime | None = None
+    # Uit de screeningvraag ("wil je deze lessenreeks lesgeven?") -- False telt als
+    # volledig onbeschikbaar, ongeacht `waarden` (zie domain/beschikbaarheid.py).
+    doet_mee: bool = True
 
 
 @dataclass
@@ -35,6 +38,7 @@ class NaamProbleem:
     waarden: dict[str, Antwoordwaarde] = field(default_factory=dict)
     ingevuld_op: datetime | None = None
     les_id: str | None = None
+    doet_mee: bool = True
 
 
 @dataclass

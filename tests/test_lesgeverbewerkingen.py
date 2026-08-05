@@ -24,15 +24,15 @@ def test_voeg_lesgever_toe(state):
     assert lg.id == lg_id
     assert lg.naam == "Anne"
     assert lg.actief is True
-    assert lg.ervaring_jaren == 0
+    assert lg.ervaren is False
 
 
 def test_wijzig_lesgever(state):
     lg_id = lgb.voeg_lesgever_toe("Anne")
-    lgb.wijzig_lesgever(lg_id, naam="Anne de Vries", ervaring_jaren=3, actief=False)
+    lgb.wijzig_lesgever(lg_id, naam="Anne de Vries", ervaren=True, actief=False)
     lg = state.doc.project.lesgevers[0]
     assert lg.naam == "Anne de Vries"
-    assert lg.ervaring_jaren == 3
+    assert lg.ervaren is True
     assert lg.actief is False
 
 
@@ -59,21 +59,21 @@ def test_verwijder_lesgever_ruimt_toewijzingen_op(state):
 
 def test_samenvoeg_geimporteerde_lesgevers_update_bestaande(state):
     lgb.voeg_lesgever_toe("Anne")
-    lgb.wijzig_lesgever(state.doc.project.lesgevers[0].id, ervaring_jaren=1)
+    lgb.wijzig_lesgever(state.doc.project.lesgevers[0].id, ervaren=False)
 
     aantal = lgb.samenvoeg_geimporteerde_lesgevers(
-        [Lesgever(naam="Anne", ervaring_jaren=5, actief=False)]
+        [Lesgever(naam="Anne", ervaren=True, actief=False)]
     )
     assert aantal == 1
     assert len(state.doc.project.lesgevers) == 1
     lg = state.doc.project.lesgevers[0]
-    assert lg.ervaring_jaren == 5
+    assert lg.ervaren is True
     assert lg.actief is False
 
 
 def test_samenvoeg_geimporteerde_lesgevers_voegt_nieuwe_toe(state):
     lgb.voeg_lesgever_toe("Anne")
-    aantal = lgb.samenvoeg_geimporteerde_lesgevers([Lesgever(naam="Bob", ervaring_jaren=2)])
+    aantal = lgb.samenvoeg_geimporteerde_lesgevers([Lesgever(naam="Bob", ervaren=True)])
     assert aantal == 1
     namen = {lg.naam for lg in state.doc.project.lesgevers}
     assert namen == {"Anne", "Bob"}

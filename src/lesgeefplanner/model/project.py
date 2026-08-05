@@ -11,7 +11,7 @@ from .availability import Ronde
 from .scope import Scope
 from .ids import nieuw_id
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: Lesgever.ervaring_jaren (int) -> ervaren (bool), zie migrations.py
 
 
 class Werkblad(BaseModel):

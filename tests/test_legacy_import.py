@@ -124,4 +124,4 @@ def test_lesgevers_xlsx_wordt_geimporteerd(tmp_path: Path):
     assert namen == {"Anne", "Bob"}
     # Namen blijven volledig -- geen inkorting zoals de oude import_lesgevers() deed.
     anne = next(lg for lg in project.lesgevers if lg.naam == "Anne")
-    assert anne.ervaring_jaren == 3
+    assert anne.ervaren is True  # 3 jaar -> boven de (bewust simpele) 1-jaar-drempel

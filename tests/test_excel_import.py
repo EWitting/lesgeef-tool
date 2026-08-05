@@ -15,7 +15,7 @@ def _project() -> tuple[Project, Les]:
     project = Project(naam="Test")
     seizoen = Seizoen(naam="Voorseizoen 1", begin=date(2026, 4, 19), eind=date(2026, 5, 10))
     project.seizoenen = [seizoen]
-    anne = Lesgever(naam="Anne", ervaring_jaren=2)
+    anne = Lesgever(naam="Anne", ervaren=True)
     bob = Lesgever(naam="Bob")
     project.lesgevers = [anne, bob]
 

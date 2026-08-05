@@ -13,11 +13,11 @@ import pandas as pd
 
 from ..model.entities import Lesgever
 
-DoelVeld = Literal["naam", "ervaring_jaren", "actief"]
+DoelVeld = Literal["naam", "ervaren", "actief"]
 
 _TREFWOORDEN: dict[DoelVeld, tuple[str, ...]] = {
     "naam": ("naam", "name"),
-    "ervaring_jaren": ("ervar", "experience"),
+    "ervaren": ("ervar", "experience"),
     "actief": ("actief", "active"),
 }
 
@@ -67,9 +67,9 @@ def lees_lesgevers(
         naam = str(row[mapping["naam"]]).strip()
         if not naam or naam.lower() == "nan":
             continue
-        ervaring = _parse_ervaring(row[mapping["ervaring_jaren"]], naam, waarschuwingen)
+        ervaren = _parse_ervaren(row[mapping["ervaren"]], naam, waarschuwingen)
         actief = _parse_actief(row[mapping["actief"]], naam, waarschuwingen)
-        lesgevers.append(Lesgever(naam=naam, ervaring_jaren=ervaring, actief=actief))
+        lesgevers.append(Lesgever(naam=naam, ervaren=ervaren, actief=actief))
 
     return RosterImportResultaat(lesgevers=lesgevers, waarschuwingen=waarschuwingen)
 
@@ -82,21 +82,38 @@ def _vind_kolom(kolommen: list[str], trefwoorden: tuple[str, ...]) -> str | None
     return None
 
 
-def _parse_ervaring(waarde, naam: str, waarschuwingen: list[str]) -> int:
+_WAAR = ("true", "ja", "1", "waar", "x", "✓")
+_ONWAAR = ("false", "nee", "0", "onwaar")
+
+
+def _parse_ervaren(waarde, naam: str, waarschuwingen: list[str]) -> bool:
+    """Een lege cel betekent hier stilzwijgend 'nee' (net als een leeg vinkje) -- dat is
+    geen leesfout om over te waarschuwen, in tegenstelling tot 'actief' hieronder waar een
+    lege cel wel een waarschuwing + de veilige aanname (actief) krijgt.
+
+    Herkent ook nog een kaal getal (bv. uit een oud bestand van vóór de ervaren-vlag, met
+    een kolom "Ervaring (jaren)") als >=1 jaar, zodat zulke bestanden niet stilzwijgend hun
+    ervaring-informatie verliezen bij import."""
+    if pd.isna(waarde) or str(waarde).strip() == "":
+        return False
+    tekst = str(waarde).strip().lower()
+    if tekst in _WAAR:
+        return True
+    if tekst in _ONWAAR:
+        return False
     try:
-        if pd.isna(waarde):
-            raise ValueError
-        return int(waarde)
-    except (TypeError, ValueError):
-        waarschuwingen.append(f"{naam}: ervaring niet leesbaar ('{waarde}'), 0 aangenomen.")
-        return 0
+        return float(tekst) >= 1
+    except ValueError:
+        pass
+    waarschuwingen.append(f"{naam}: 'ervaren' niet leesbaar ('{waarde}'), nee aangenomen.")
+    return False
 
 
 def _parse_actief(waarde, naam: str, waarschuwingen: list[str]) -> bool:
     tekst = str(waarde).strip().lower()
-    if tekst in ("true", "ja", "1", "waar"):
+    if tekst in _WAAR:
         return True
-    if tekst in ("false", "nee", "0", "onwaar"):
+    if tekst in _ONWAAR:
         return False
     waarschuwingen.append(f"{naam}: 'actief' niet leesbaar ('{waarde}'), actief aangenomen.")
     return True

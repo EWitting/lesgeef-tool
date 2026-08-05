@@ -1,34 +1,29 @@
 """Importeert een Google Forms-antwoordenexport (.xlsx). Zie docs/DESIGN.md §4.5.
 
-Twee koppelstrategieën, in volgorde:
-1. Kolomkop bevat '#<index>' -> koppel via Ronde.vragen[index].les_id. Dit is de normale
-   weg voor een via forms_script.py aangemaakt formulier, en werkt ongeacht of het label
-   zelf is aangepast of de vraag is herschikt.
-2. Geen '#n' gevonden (handgemaakt formulier) -> parse het label als Nederlandse
-   dag+maand(+tijd) en koppel op (datum, begin_tijd). Bij twijfel (0 of >1 kandidaten)
-   wordt de kolom als 'niet gekoppeld' gerapporteerd -- nooit geraden.
+De naam- en tijdstempelkolom worden op trefwoord herkend (bevat "naam" resp.
+"tijdstempel"/"timestamp" -- geen exacte match, want de vraagtekst zelf kan verschillen:
+"Wat is je naam?" bij een Apps Script-formulier, "Wie ben je?" bij een oud-stijl
+handgemaakt formulier). Alle ANDERE kolommen koppelen op VOLGORDE, niet op tekst (voor de
+bewuste keuze, zie forms_script.py): in bestandsvolgorde 1-op-1 aan de screeningvraag en
+dan `ronde.vragen` (gesorteerd op index). Dit gaat ervan uit dat de vraagvolgorde in het
+formulier nog overeenkomt met de ronde -- bij twijfel (aantal kolommen klopt niet) wordt
+dat als waarschuwing gemeld i.p.v. stilzwijgend verkeerd te koppelen.
 
 Een lege cel betekent ONBEKEND, nooit 'nee' -- dat onderscheid is echt (niet gereageerd is
 iets anders dan niet kunnen)."""
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
-from ..domain.formatting import parse_nl_maand, parse_nl_tijd
 from ..domain.names import is_exact, stel_voor
 from ..model.availability import Antwoordwaarde, Ronde
 from ..model.project import Project
 from .types import GekoppeldAntwoord, ImportResultaat, NaamProbleem
 
 _WAARDE_MAP: dict[str, Antwoordwaarde] = {"ja": "ja", "misschien": "misschien", "nee": "nee"}
-_HEKJE_PATROON = re.compile(r"#(\d+)\s*$")
-_LABEL_PATROON = re.compile(
-    r"(?P<dag>\d{1,2})\s+(?P<maand>[a-zA-Zé]+)(?:[^\d]*(?P<tijd>\d{1,2}:\d{2}))?"
-)
 
 
 def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> ImportResultaat:
@@ -37,27 +32,32 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
         return ImportResultaat(ronde_id=ronde.id, waarschuwingen=["Het bestand bevat geen rijen."])
 
     kolommen = [str(k) for k in df.columns]
-    naamkolom = _vind_kolom(kolommen, ("wie ben je?", "naam"))
+    # Bevat-checks (niet exacte match): de naamvraag heet "Wat is je naam?" (forms_script.py)
+    # of, in een ouder-stijl formulier, "Wie ben je?" -- allebei bevatten "naam" resp. "wie
+    # ben je", dus een losse trefwoordenlijst hoeft niet exact de volledige vraagtekst te zijn.
+    naamkolom = _vind_kolom(kolommen, ("naam", "wie ben je"))
     tijdstempelkolom = _vind_kolom(kolommen, ("tijdstempel", "timestamp"))
 
-    vraag_per_index = {v.index: v for v in ronde.vragen}
-    kolom_naar_les_id: dict[str, str] = {}
-    niet_gekoppeld: list[str] = []
+    # Alles behalve naam/tijdstempel, in bestandsvolgorde: eerst de screeningvraag, dan de
+    # rooster-rijen (of, bij een oud-stijl formulier met een losse vraag per les, de
+    # vragen zelf) -- precies de volgorde waarin forms_script.py ze aanmaakt.
+    overige = [k for k in kolommen if k not in (naamkolom, tijdstempelkolom)]
+    screeningkolom = overige[0] if overige else None
+    vraagkolommen = overige[1:]
 
-    for kolom in kolommen:
-        if kolom in (naamkolom, tijdstempelkolom):
-            continue
-        hekje = _HEKJE_PATROON.search(kolom)
-        if hekje is not None:
-            vraag = vraag_per_index.get(int(hekje.group(1)))
-            if vraag is not None:
-                kolom_naar_les_id[kolom] = vraag.les_id
-                continue
-        les_id = _koppel_op_label(kolom, project)
-        if les_id is not None:
-            kolom_naar_les_id[kolom] = les_id
-        else:
-            niet_gekoppeld.append(kolom)
+    vragen_gesorteerd = sorted(ronde.vragen, key=lambda v: v.index)
+    kolom_naar_les_id = {
+        kolom: vraag.les_id for kolom, vraag in zip(vraagkolommen, vragen_gesorteerd)
+    }
+    niet_gekoppeld = vraagkolommen[len(vragen_gesorteerd):]
+
+    waarschuwingen: list[str] = []
+    if len(vraagkolommen) != len(vragen_gesorteerd):
+        waarschuwingen.append(
+            f"Het bestand heeft {len(vraagkolommen)} beschikbaarheidskolom(men), maar de "
+            f"ronde heeft {len(vragen_gesorteerd)} vragen -- controleer of de volgorde "
+            f"van de vragen nog bij de ronde past. Overtollige kolommen zijn overgeslagen."
+        )
 
     lesgevers = project.lesgevers
     naam_naar_lesgever = {lg.naam: lg for lg in lesgevers}
@@ -88,6 +88,8 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
             if tekst in _WAARDE_MAP:
                 waarden[les_id] = _WAARDE_MAP[tekst]
 
+        doet_mee = _lees_doet_mee(rij, screeningkolom)
+
         lesgever = naam_naar_lesgever.get(ruwe_naam)
         if lesgever is None:
             voorstellen = stel_voor(ruwe_naam, lesgevers)
@@ -100,6 +102,7 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
                         voorstellen=[(lg.id, score) for lg, score in voorstellen[:5]],
                         waarden=waarden,
                         ingevuld_op=ingevuld_op,
+                        doet_mee=doet_mee,
                     )
                 )
                 continue
@@ -107,7 +110,8 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
         bestaand = antwoorden_per_lesgever.get(lesgever.id)
         if bestaand is None:
             antwoorden_per_lesgever[lesgever.id] = GekoppeldAntwoord(
-                lesgever_id=lesgever.id, waarden=waarden, ingevuld_op=ingevuld_op
+                lesgever_id=lesgever.id, waarden=waarden, ingevuld_op=ingevuld_op,
+                doet_mee=doet_mee,
             )
         else:
             dubbele_reacties[lesgever.naam] = dubbele_reacties.get(lesgever.naam, 1) + 1
@@ -115,17 +119,18 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
                 bestaand.ingevuld_op is None or ingevuld_op > bestaand.ingevuld_op
             ):
                 antwoorden_per_lesgever[lesgever.id] = GekoppeldAntwoord(
-                    lesgever_id=lesgever.id, waarden=waarden, ingevuld_op=ingevuld_op
+                    lesgever_id=lesgever.id, waarden=waarden, ingevuld_op=ingevuld_op,
+                    doet_mee=doet_mee,
                 )
 
-    waarschuwingen = [
+    waarschuwingen += [
         f"{naam} heeft {aantal}x gereageerd -- de nieuwste reactie is gebruikt."
         for naam, aantal in dubbele_reacties.items()
     ]
     if niet_gekoppeld:
         waarschuwingen.append(
-            f"{len(niet_gekoppeld)} kolom(men) konden niet aan een les gekoppeld worden "
-            f"en zijn overgeslagen."
+            f"{len(niet_gekoppeld)} overtollige kolom(men) konden niet aan een les "
+            f"gekoppeld worden en zijn overgeslagen."
         )
 
     return ImportResultaat(
@@ -137,42 +142,21 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
     )
 
 
-def _vind_kolom(kolommen: list[str], mogelijke_namen: tuple[str, ...]) -> str | None:
+def _lees_doet_mee(rij, screeningkolom: str | None) -> bool:
+    """Geen screeningkolom (handgemaakt formulier zonder die vraag) of een leeg/onbekend
+    antwoord -> aannemen dat iemand meedoet (veilige standaard, Antwoord.doet_mee is ook
+    standaard True). Alleen een expliciete 'nee' telt als niet-meedoen."""
+    if screeningkolom is None:
+        return True
+    cel = rij.get(screeningkolom)
+    if pd.isna(cel):
+        return True
+    return str(cel).strip().lower() != "nee"
+
+
+def _vind_kolom(kolommen: list[str], trefwoorden: tuple[str, ...]) -> str | None:
     for kolom in kolommen:
-        if kolom.strip().lower() in mogelijke_namen:
+        laag = kolom.strip().lower()
+        if any(trefwoord in laag for trefwoord in trefwoorden):
             return kolom
-    return None
-
-
-def _koppel_op_label(label: str, project: Project) -> str | None:
-    """Terugval voor handgemaakte formulieren zonder '#index'. Koppelt op (dag, maand,
-    evt. tijd) -- NOOIT op een jaartal uit de export (dat brak bij seizoenen die over de
-    jaarwisseling lopen, zoals sep-apr). Bij 0 of >1 kandidaten: niet koppelen, laat de
-    gebruiker het handmatig oplossen."""
-    match = _LABEL_PATROON.search(label)
-    if match is None:
-        return None
-    try:
-        dag = int(match.group("dag"))
-        maand = parse_nl_maand(match.group("maand"))
-    except (ValueError, KeyError):
-        return None
-
-    tijd_tekst = match.group("tijd")
-    tijd = None
-    if tijd_tekst:
-        try:
-            tijd = parse_nl_tijd(tijd_tekst)
-        except ValueError:
-            tijd = None
-
-    kandidaten = [
-        les
-        for les in project.lessen
-        if les.datum.day == dag
-        and les.datum.month == maand
-        and (tijd is None or les.begin_tijd == tijd)
-    ]
-    if len(kandidaten) == 1:
-        return kandidaten[0].id
     return None

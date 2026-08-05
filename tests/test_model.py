@@ -18,7 +18,7 @@ def test_project_json_roundtrip():
         seizoenen=[
             Seizoen(naam="Voorseizoen 1", begin=date(2026, 4, 19), eind=date(2026, 5, 10)),
         ],
-        lesgevers=[Lesgever(naam="Anne", ervaring_jaren=2)],
+        lesgevers=[Lesgever(naam="Anne", ervaren=True)],
     )
     les = Les(
         datum=date(2026, 4, 22),

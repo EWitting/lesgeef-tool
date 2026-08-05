@@ -1,6 +1,7 @@
 """Rolt een bestaand project door naar een nieuw seizoen: rooster en lesgevers blijven
-(met +1 jaar ervaring), toewijzingen/rondes worden leeggemaakt, kalenderdatums schuiven op.
-Zie docs/PLAN.md fase 9 ("Nieuw jaar op basis van vorig bestand")."""
+(iedereen wordt gemarkeerd als ervaren), toewijzingen/rondes worden leeggemaakt,
+kalenderdatums schuiven op. Zie docs/PLAN.md fase 9 ("Nieuw jaar op basis van vorig
+bestand")."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -43,9 +44,9 @@ def rol_project_door(
     for lesgever in oud.lesgevers:
         # Id blijft bewust hetzelfde -- dit is dezelfde persoon, en toekomstige koppelingen
         # (bv. Excel Code-kolommen, rondes) moeten voor dezelfde lesgever blijven werken.
-        nieuw.lesgevers.append(
-            lesgever.model_copy(update={"ervaring_jaren": lesgever.ervaring_jaren + 1})
-        )
+        # Iedereen die een heel seizoen heeft meegedraaid, is nu ervaren (dit was vroeger
+        # een "+1 jaar", maar de solver/analyse keken toch alleen naar >=1 jaar).
+        nieuw.lesgevers.append(lesgever.model_copy(update={"ervaren": True}))
 
     for les in oud.lessen:
         if les.soort != "extra":

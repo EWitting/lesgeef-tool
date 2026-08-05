@@ -5,15 +5,15 @@ from lesgeefplanner.model import Lesgever, Project, Seizoen, WeekSlot
 from lesgeefplanner.model.entities import Herkomst, Les, Toewijzing
 
 
-def test_lesgevers_blijven_met_plus_een_jaar_ervaring():
+def test_lesgevers_blijven_en_worden_ervaren():
     oud = Project(naam="Oud")
-    lg = Lesgever(naam="Anne", ervaring_jaren=2, actief=True)
+    lg = Lesgever(naam="Anne", ervaren=False, actief=True)
     oud.lesgevers = [lg]
 
     nieuw = rol_project_door(oud, "Nieuw")
     assert len(nieuw.lesgevers) == 1
     assert nieuw.lesgevers[0].id == lg.id  # zelfde persoon, zelfde id
-    assert nieuw.lesgevers[0].ervaring_jaren == 3
+    assert nieuw.lesgevers[0].ervaren is True  # heeft nu een heel seizoen meegedraaid
     assert nieuw.lesgevers[0].naam == "Anne"
 
 

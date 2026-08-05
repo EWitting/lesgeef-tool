@@ -57,14 +57,16 @@ def verwerk_importresultaat(
     nieuwe_antwoorden: dict[str, Antwoord] = {}
     for ga in resultaat.gekoppelde_antwoorden:
         nieuwe_antwoorden[ga.lesgever_id] = Antwoord(
-            lesgever_id=ga.lesgever_id, waarden=ga.waarden, ingevuld_op=ga.ingevuld_op
+            lesgever_id=ga.lesgever_id, waarden=ga.waarden, ingevuld_op=ga.ingevuld_op,
+            doet_mee=ga.doet_mee,
         )
     for probleem in resultaat.naamproblemen:
         gekozen_id = keuzes_naamproblemen.get(probleem.ruwe_naam)
         if gekozen_id is None:
             continue
         nieuwe_antwoorden[gekozen_id] = Antwoord(
-            lesgever_id=gekozen_id, waarden=probleem.waarden, ingevuld_op=probleem.ingevuld_op
+            lesgever_id=gekozen_id, waarden=probleem.waarden, ingevuld_op=probleem.ingevuld_op,
+            doet_mee=probleem.doet_mee,
         )
 
     if not nieuwe_antwoorden:

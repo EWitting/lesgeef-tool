@@ -22,7 +22,7 @@ def test_volledig_handmatig_rooster_overleeft_opslaan_en_heropenen(tmp_path: Pat
         st.doc.project.seizoenen.append(
             Seizoen(naam="Voorseizoen 1", begin=date(2026, 4, 19), eind=date(2026, 5, 10))
         )
-        anne = Lesgever(naam="Anne", ervaring_jaren=2)
+        anne = Lesgever(naam="Anne", ervaren=True)
         bob = Lesgever(naam="Bob")
         st.doc.project.lesgevers.extend([anne, bob])
 
@@ -74,4 +74,4 @@ def test_volledig_handmatig_rooster_overleeft_opslaan_en_heropenen(tmp_path: Pat
 
     assert len(project.lessen) == 4
     assert project.lesgevers[0].naam == "Anne"
-    assert project.lesgevers[0].ervaring_jaren == 2
+    assert project.lesgevers[0].ervaren is True

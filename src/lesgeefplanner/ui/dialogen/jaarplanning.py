@@ -32,7 +32,7 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
         # Volgorde volgt de gebruiker: eerst instellen (seizoenen, weekrooster), dan pas de
         # actie die daarvan afhangt (kalender samenstellen) -- niet andersom (zie
         # docs/BESLISSINGEN.md, "jaarplanning-volgorde").
-        ui.label("Seizoenen").classes("text-caption text-weight-bold q-mt-sm")
+        ui.label("Lessenreeksen").classes("text-caption text-weight-bold q-mt-sm")
         for seizoen in project.seizoenen:
             _seizoen_rij(container, seizoen.id)
         _nieuw_seizoen_rij(container)
@@ -40,7 +40,7 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
         ui.separator().classes("q-my-sm")
         ui.label("Jaarrooster (standaard weekrooster)").classes("text-caption text-weight-bold")
         ui.label(
-            "Wordt gebruikt door elk seizoen zonder eigen weekrooster."
+            "Wordt gebruikt door elke lessenreeks zonder eigen weekrooster."
         ).classes("text-caption text-grey-7")
         _weekrooster_editor(container, None, project.weekrooster)
 
@@ -61,15 +61,9 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
             ).props("flat dense color=primary no-caps")
         ui.label(
             "'Kalender bijwerken' past niets automatisch toe -- toont eerst wat er zou "
-            "veranderen op basis van seizoenen en weekrooster hierboven. 'Extra les "
+            "veranderen op basis van lessenreeksen en weekrooster hierboven. 'Extra les "
             "toevoegen' is voor eenmalige, losse lessen (bv. een Open Les)."
         ).classes("text-caption text-grey-7")
-
-        ui.separator().classes("q-my-sm")
-        with ui.expansion("Geavanceerd: project als JSON (alleen-lezen)").classes("full-width"):
-            ui.code(project.model_dump_json(indent=2), language="json").classes(
-                "full-width"
-            ).style("max-height: 300px; overflow-y: auto;")
 
 
 async def _klik_extra_les() -> None:
@@ -123,7 +117,7 @@ def _nieuw_seizoen_rij(container: ui.column) -> None:
     with ui.row().classes("items-center full-width q-mt-xs").style(
         "flex-wrap: wrap; gap: 6px;"
     ):
-        naam_veld = ui.input("Naam nieuw seizoen").props("dense").style(
+        naam_veld = ui.input("Naam nieuwe lessenreeks").props("dense").style(
             "flex: 1 1 140px; min-width: 140px;"
         )
         begin_veld = datum_veld("Begin").style("flex: 1 1 130px; min-width: 130px;")

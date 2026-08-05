@@ -8,6 +8,7 @@ midden: de planning, ALTIJD zichtbaar (dit is het hart van de app) + acties die 
 rechts: inspector -- status/les/persoon."""
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from nicegui import ui
@@ -26,7 +27,7 @@ from .startscherm import create_startscherm
 from .state import state
 
 _LINKS_SPLITTER_STANDAARD = 19.0  # procent van de vensterbreedte
-_RECHTS_SPLITTER_STANDAARD = 76.0  # procent van (midden + rechts), dus rechts = 24%
+_RECHTS_SPLITTER_STANDAARD = 24.0  # procent van (midden + rechts) -- reverse=True, dus dit IS het rechterpaneel
 
 # (sectie-id, icoon, label, sleutel in stappen.alle_stappen()) -- de navigatie ZELF, in
 # gebruiksvolgorde. "Inroosteren" en "Delen" staan bewust niet in deze lijst: inroosteren
@@ -38,6 +39,11 @@ _SECTIES: list[tuple[str, str, str, str]] = [
     ("beschikbaarheid", "fact_check", "Beschikbaarheid", "Beschikbaarheid"),
 ]
 _STATUS_STIP_KLEUR = {"klaar": "transparent", "aandacht": "#f59e0b", "leeg": "#cbd5e0"}
+_STATUS_STIP_UITLEG = {
+    "klaar": "Klaar -- niets te doen.",
+    "aandacht": "Aandacht nodig.",
+    "leeg": "Nog niet begonnen.",
+}
 
 
 @ui.page("/")
@@ -73,6 +79,19 @@ def index() -> None:
         # de rij uit elkaar duwen of onleesbaar overlappen.
         ".les-slot-knop .q-btn__content > span { overflow: hidden; text-overflow: "
         "ellipsis; white-space: nowrap; display: block; max-width: 100%; }"
+        # De sleepbalk van een q-splitter is standaard maar 1px en bijna onzichtbaar tegen
+        # een witte achtergrond -- zonder duidelijk zichtbare balk (en cursor) heeft niemand
+        # door dat er iets sleepbaars zit. Iets breder, een grijze kleur, donkerder bij
+        # hover/actief slepen, en een expliciete cursor (voor het geval iets anders 'm zou
+        # overschrijven).
+        ".q-splitter__separator { background: #d5dbe0 !important; width: 6px !important; "
+        "cursor: col-resize !important; }"
+        ".q-splitter__separator:hover, .q-splitter__separator--active "
+        "{ background: #90a4ae !important; }"
+        # Het in-/uitklap-knopje middenin de sleepbalk (zie `_maak_inklap_knop`) moet er
+        # overheen kunnen zonder zelf de sleepbalk te blokkeren.
+        ".splitter-inklap-knop { position: absolute; top: 50%; left: 50%; "
+        "transform: translate(-50%, -50%); z-index: 2; }"
         "</style>"
     )
     root = ui.column().classes("w-full no-wrap").style(
@@ -97,6 +116,7 @@ def index() -> None:
 
 def _bouw_hoofdlayout(on_sluiten) -> None:
     links_zichtbaar = {"waarde": True, "laatste_breedte": _LINKS_SPLITTER_STANDAARD}
+    rechts_zichtbaar = {"waarde": True, "laatste_breedte": _RECHTS_SPLITTER_STANDAARD}
 
     # Bewust een gewone ui.row() in plaats van ui.header(): ui.header() is een top-level
     # layout-element dat NIET genest mag worden in root (een ui.column()), en we willen de
@@ -109,11 +129,6 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         "box-shadow: 0 1px 4px rgba(0,0,0,0.25); z-index: 1;"
     ):
         with ui.row().classes("items-center q-gutter-sm"):
-            ui.button(
-                icon="menu", on_click=lambda: _toggle(buiten_splitter, links_zichtbaar)
-            ).props(
-                "flat color=white dense"
-            ).tooltip("Linkerpaneel in-/uitklappen")
             projectnaam_label = ui.label(state.doc.project.naam).classes(
                 "text-h6 text-white"
             )
@@ -151,7 +166,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             )
             ui.button(
                 "Opslaan", icon="save", on_click=lambda: _opslaan()
-            ).props("flat color=white dense no-caps")
+            ).props("flat color=white dense no-caps").tooltip("Opslaan (Ctrl+S)")
             ui.button(
                 "Sluiten", icon="close", on_click=on_sluiten
             ).props("flat color=white dense no-caps")
@@ -159,6 +174,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
     actieve_sectie = {"waarde": _SECTIES[0][0]}
     nav_rijen: dict[str, ui.row] = {}
     nav_stippen: dict[str, ui.element] = {}
+    nav_stip_tooltips: dict[str, ui.tooltip] = {}
     secties: dict[str, ui.column] = {}
 
     def _kies_sectie(sectie_id: str) -> None:
@@ -177,12 +193,18 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
     buiten_splitter = ui.splitter(value=_LINKS_SPLITTER_STANDAARD, limits=(0, 45)).classes(
         "w-full"
     ).style("flex: 1; margin: 0; min-height: 0; height: 100%;")
+    _maak_inklap_knop(buiten_splitter, links_zichtbaar, omgekeerd=False)
     with buiten_splitter:
         with buiten_splitter.before:
+            # align-self: stretch -- NiceGUI geeft een splitter-paneel (net als elke
+            # column/row) standaard "align-items: flex-start", waardoor dit kind anders
+            # krimpt tot de breedte van zijn eigen inhoud i.p.v. de (correct berekende!)
+            # breedte die de splitter 'm toekent -- dát gaf de dode ruimte tussen de
+            # scrollbar en de paneelrand die breder werd naarmate je verder sleepte.
             with ui.column().style(
                 "height: 100%; overflow-y: auto; overflow-x: hidden; "
                 "border-right: 1px solid #e0e0e0; padding: 12px 12px 16px 12px; margin: 0; "
-                "gap: 12px;"
+                "gap: 12px; align-self: stretch; width: 100%;"
             ):
                 with ui.column().classes("full-width").style("gap: 2px;"):
                     for sectie_id, icoon, label, _stap_sleutel in _SECTIES:
@@ -200,8 +222,11 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                             stip = ui.element("div").style(
                                 "width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;"
                             )
+                            with stip:
+                                stip_tooltip = ui.tooltip("")
                         nav_rijen[sectie_id] = rij
                         nav_stippen[sectie_id] = stip
+                        nav_stip_tooltips[sectie_id] = stip_tooltip
 
                 ui.separator()
 
@@ -218,14 +243,25 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                 _kies_sectie(actieve_sectie["waarde"])
 
         with buiten_splitter.after:
+            # reverse=True: `value` is hiermee het percentage van het RECHTERpaneel (i.p.v.
+            # het middenpaneel) -- zo betekent "0" voor beide splitters hetzelfde ("dit
+            # paneel dichtgeklapt"), en werkt dezelfde `_toggle`/`_maak_inklap_knop` voor
+            # links én rechts zonder aparte richtingslogica. limits ondergrens MOET 0 zijn
+            # (niet bv. 10) -- de splitter klemt `set_value()` net zo goed vast aan de
+            # limits als slepen met de muis, dus met een ondergrens > 0 kon dit paneel
+            # nooit volledig dichtklappen.
             binnen_splitter = ui.splitter(
-                value=_RECHTS_SPLITTER_STANDAARD, limits=(50, 90)
+                value=_RECHTS_SPLITTER_STANDAARD, limits=(0, 50), reverse=True
             ).style("height: 100%;")
+            _maak_inklap_knop(binnen_splitter, rechts_zichtbaar, omgekeerd=True)
             with binnen_splitter:
                 with binnen_splitter.before:
+                    # gap: 0 -- een ui.column() heeft standaard 1rem verticale ruimte
+                    # tussen kinderen (voor gewone formulieren bedoeld); de lesrijen moeten
+                    # strak tegen elkaar staan, dus dat moet hier expliciet uit.
                     with ui.column().style(
                         "height: 100%; overflow-y: auto; overflow-x: hidden; padding: 0; "
-                        "margin: 0; min-width: 0;"
+                        "margin: 0; min-width: 0; gap: 0; align-self: stretch; width: 100%;"
                     ) as midden_paneel:
                         planning_view = PlanningView(
                             midden_paneel,
@@ -237,7 +273,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
                 with binnen_splitter.after:
                     with ui.column().style(
                         "height: 100%; overflow-y: auto; overflow-x: hidden; padding: 16px; "
-                        "margin: 0;"
+                        "margin: 0; align-self: stretch; width: 100%;"
                     ) as rechts_paneel:
                         inspector = Inspector(rechts_paneel, planning_view)
 
@@ -260,8 +296,9 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
 
         statussen = stappen.alle_stappen(state.doc.project, state.peildatum())
         for sectie_id, _icoon, _label, stap_sleutel in _SECTIES:
-            kleur = _STATUS_STIP_KLEUR[statussen[stap_sleutel]]
-            nav_stippen[sectie_id].style(f"background: {kleur};")
+            status = statussen[stap_sleutel]
+            nav_stippen[sectie_id].style(f"background: {_STATUS_STIP_KLEUR[status]};")
+            nav_stip_tooltips[sectie_id].set_text(_STATUS_STIP_UITLEG[status])
 
     def _ververs_na_wijziging() -> None:
         """Ververst header (opgeslagen-indicator, undo/redo), inspectiepaneel (bevindingen,
@@ -279,6 +316,10 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         beschrijving = state.doc.ongedaan_maken()
         if beschrijving is not None:
             ui.notify(f"Ongedaan gemaakt: {beschrijving}", type="info")
+            # Kan zowel een handmatige wijziging als de toepassing van een solver-resultaat
+            # ongedaan maken -- in beide gevallen klopt "Waarom deze score?" niet meer met
+            # de huidige toewijzingen, dus niet stiekem een verouderd getal laten staan.
+            state.laatste_plan_result = None
             planning_view.rebuild()
             _ververs_na_wijziging()
 
@@ -287,6 +328,7 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
         beschrijving = state.doc.opnieuw()
         if beschrijving is not None:
             ui.notify(f"Opnieuw uitgevoerd: {beschrijving}", type="info")
+            state.laatste_plan_result = None
             planning_view.rebuild()
             _ververs_na_wijziging()
 
@@ -339,6 +381,11 @@ def _bouw_hoofdlayout(on_sluiten) -> None:
             _ongedaan_maken()
         elif e.key == "y":
             _opnieuw()
+        elif e.key == "s":
+            # _opslaan is async (kan een bestandsdialoog tonen bij de allereerste keer
+            # opslaan) -- _op_toets zelf is een gewone (sync) keyboard-callback, dus moet
+            # 'm expliciet als taak inplannen i.p.v. de coroutine hier direct aan te roepen.
+            asyncio.create_task(_opslaan())
 
     ui.keyboard(on_key=_op_toets)
 
@@ -355,9 +402,11 @@ def _autosave_tick(ververs_header) -> None:
 
 
 def _toggle(splitter: ui.splitter, toestand: dict) -> None:
-    """Klapt de linkerrail in/uit door de sleepbare splitter zelf naar 0 te zetten (i.p.v.
+    """Klapt een paneel in/uit door de sleepbare splitter zelf naar 0 te zetten (i.p.v.
     de inhoud te verbergen) -- zo blijft precies dezelfde sleepbalk werken, en onthoudt
-    dichtklappen de laatst gesleepte breedte om bij het weer openen terug te zetten."""
+    dichtklappen de laatst gesleepte breedte om bij het weer openen terug te zetten.
+    Werkt voor beide splitters omdat `binnen_splitter` `reverse=True` heeft: 0 betekent
+    voor allebei "dit paneel dichtgeklapt", nooit "het andere paneel is dicht"."""
     toestand["waarde"] = not toestand["waarde"]
     if toestand["waarde"]:
         splitter.set_value(toestand["laatste_breedte"])
@@ -365,3 +414,30 @@ def _toggle(splitter: ui.splitter, toestand: dict) -> None:
         if splitter.value and splitter.value > 3:
             toestand["laatste_breedte"] = splitter.value
         splitter.set_value(0)
+
+
+def _pijl_icoon(open_: bool, omgekeerd: bool) -> str:
+    """Welke kant de pijl op wijst hangt af van welke kant het paneel dichtklapt: voor de
+    linkerrail wijst 'm naar links als hij open is (klik om dichter naar links te klappen)
+    en naar rechts als hij dicht is (klik om weer open te klappen); voor het rechterpaneel
+    precies gespiegeld (`omgekeerd=True`)."""
+    if open_:
+        return "chevron_right" if omgekeerd else "chevron_left"
+    return "chevron_left" if omgekeerd else "chevron_right"
+
+
+def _maak_inklap_knop(splitter: ui.splitter, toestand: dict, omgekeerd: bool) -> None:
+    """Een pijltje middenin de sleepbalk zelf om het paneel in/uit te klappen -- naar
+    verwachting intuïtiever dan een los hamburger-icoon in de header, en dit werkt nu voor
+    ZOWEL de linkerrail als het rechterpaneel (dat had voorheen geen in/uitklap-knop)."""
+    with splitter.separator:
+        knop = ui.button(icon=_pijl_icoon(toestand["waarde"], omgekeerd)).props(
+            "flat dense round size=sm color=grey-8"
+        ).classes("splitter-inklap-knop")
+
+    def _klik() -> None:
+        _toggle(splitter, toestand)
+        knop.set_icon(_pijl_icoon(toestand["waarde"], omgekeerd))
+
+    knop.on("click", _klik)
+    knop.tooltip("Paneel in-/uitklappen")

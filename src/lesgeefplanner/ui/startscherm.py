@@ -211,7 +211,7 @@ def _rol_door(pad_str: str, nieuwe_naam: str, on_klaar: Callable[[], None]) -> N
         return
     state.stel_project_in(nieuw_project)
     ui.notify(
-        f"{len(nieuw_project.seizoenen)} seizoen(en) en {len(nieuw_project.lesgevers)} "
+        f"{len(nieuw_project.seizoenen)} lessenreeks(en) en {len(nieuw_project.lesgevers)} "
         f"lesgevers overgenomen. Gebruik 'Kalender bijwerken' om de lessen te genereren.",
         type="positive", multi_line=True,
     )

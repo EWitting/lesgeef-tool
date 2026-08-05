@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .analysis import Bevinding
 
-_ERNST_KOP = {"fout": "FOUTEN", "waarschuwing": "WAARSCHUWINGEN", "info": "INFO"}
+_ERNST_KOP = {"fout": "PROBLEMEN", "waarschuwing": "WAARSCHUWINGEN", "info": "INFO"}
 
 
 def genereer_tekstrapport(bevindingen: list[Bevinding]) -> str:
