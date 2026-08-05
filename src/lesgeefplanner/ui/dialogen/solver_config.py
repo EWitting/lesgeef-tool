@@ -27,10 +27,13 @@ _VELDEN: list[tuple[str, str, str]] = [
 ]
 
 
-def create_solver_config_knop(container: ui.element) -> None:
+def create_solver_config_knop(container: ui.element, kleur: str | None = None) -> None:
     """Klein knopje dat de instellingen-dialoog opent. Geen apart paneel in de rail."""
     with container:
-        ui.button(icon="tune", on_click=_open_dialoog).props("flat dense").tooltip(
+        props = "flat dense round"
+        if kleur:
+            props += f" color={kleur}"
+        ui.button(icon="tune", on_click=_open_dialoog).props(props).tooltip(
             "Solver-instellingen"
         )
 
@@ -70,13 +73,13 @@ def _open_dialoog() -> None:
             ui.button(
                 "Terug naar standaard", icon="restore",
                 on_click=lambda: _klik_reset(dialoog),
-            ).props("flat color=negative")
+            ).props("flat color=negative no-caps")
             with ui.row().classes("q-gutter-sm"):
-                ui.button("Annuleren", on_click=dialoog.close).props("flat")
+                ui.button("Annuleren", on_click=dialoog.close).props("flat no-caps")
                 ui.button(
                     "Opslaan",
                     on_click=lambda: _klik_opslaan(dialoog, velden, stappen_veld),
-                ).props("color=primary")
+                ).props("color=primary no-caps")
 
     dialoog.open()
 

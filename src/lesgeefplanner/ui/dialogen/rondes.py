@@ -12,9 +12,11 @@ from ...domain.formatting import format_datum_lang
 from ...exchange.forms_import import lees_forms_export
 from ...exchange.forms_script import genereer_apps_script, genereer_labellijst
 from ...exchange.types import ImportResultaat
-from ...model import Ronde, Scope
+from ...model import Ronde
 from .. import rondebewerkingen as rb
 from ..state import state
+from ..velden import bestand_upload
+from .scope_balk import create_scope_balk
 
 
 def create_rondes_paneel(container: ui.column) -> None:
@@ -37,34 +39,21 @@ def create_rondes_paneel(container: ui.column) -> None:
 
 
 def _nieuwe_ronde_sectie(container: ui.column) -> None:
-    assert state.doc is not None
-    project = state.doc.project
-
     with ui.card().classes("q-pa-sm full-width"):
         ui.label("Nieuwe ronde").classes("text-caption text-weight-bold")
         naam_veld = ui.input("Naam (bv. 'Voorseizoen 1')").classes("full-width")
-        ui.label(f"Scope: {_scope_omschrijving(state.scope, project)}").classes(
-            "text-caption text-grey-7"
+        ui.label("Voor welke lessen?").classes("text-caption text-grey-7 q-mt-xs")
+        # Dezelfde scope-widget als boven de planning (middenpaneel) en dus ook dezelfde
+        # onderliggende Scope (docs/DESIGN.md §2.4) -- hier instellen werkt dus meteen door
+        # naar 'Automatisch invullen' en het gezondheidspaneel, en andersom.
+        scope_rij = ui.row().classes("q-gutter-sm items-center full-width").style(
+            "flex-wrap: wrap;"
         )
-        ui.label(
-            "Verander de scope via de balk boven de planning (middenpaneel) -- dezelfde "
-            "scope bepaalt ook wat 'Automatisch invullen' en het gezondheidspaneel raken "
-            "(docs/DESIGN.md §2.4)."
-        ).classes("text-caption text-grey-6")
+        create_scope_balk(scope_rij)
         ui.button(
             "Ronde aanmaken",
             on_click=lambda: _klik_ronde_aanmaken(container, naam_veld),
-        ).props("color=primary dense")
-
-
-def _scope_omschrijving(scope: Scope, project) -> str:
-    if scope.seizoen_ids:
-        seizoen_naam = {s.id: s.naam for s in project.seizoenen}
-        namen = ", ".join(seizoen_naam.get(sid, "?") for sid in scope.seizoen_ids)
-    else:
-        namen = "alle seizoenen"
-    toekomst = "alleen toekomstige lessen" if scope.alleen_toekomst else "inclusief verleden"
-    return f"{namen} ({toekomst})"
+        ).props("color=primary dense no-caps q-mt-xs")
 
 
 def _klik_ronde_aanmaken(container: ui.column, naam_veld: ui.input) -> None:
@@ -76,8 +65,8 @@ def _klik_ronde_aanmaken(container: ui.column, naam_veld: ui.input) -> None:
     ronde = _vind_ronde(ronde_id)
     if ronde is not None and not ronde.vragen:
         ui.notify(
-            "Deze ronde heeft geen enkele les geraakt -- controleer de scope-balk boven "
-            "de planning.",
+            "Deze ronde heeft geen enkele les geraakt -- controleer 'Voor welke lessen?' "
+            "hierboven.",
             type="warning",
         )
     else:
@@ -104,7 +93,7 @@ def _ronde_kaart(container: ui.column, ronde_id: str) -> None:
     with ui.expansion(
         f"{ronde.naam} — {len(ronde.vragen)} lessen, "
         f"{len(gereageerd_ids)}/{len(actieve_lesgevers)} gereageerd"
-    ).classes("full-width q-mt-xs") as exp:
+    ).classes("full-width q-mt-xs"):
         ui.label(f"Aangemaakt: {format_datum_lang(ronde.aangemaakt_op.date())}").classes(
             "text-caption text-grey-7"
         )
@@ -166,13 +155,11 @@ def _kopieer(tekst: str, melding: str) -> None:
 
 def _import_sectie(container: ui.column, ronde: Ronde) -> None:
     ui.label(
-        "Upload het antwoordenbestand (Google Forms → Reacties → xlsx exporteren)."
+        "Exporteer het antwoordenbestand via Google Forms → Reacties → xlsx exporteren."
     ).classes("text-caption q-mb-xs")
-    ui.upload(
-        label="Antwoorden .xlsx",
-        auto_upload=True,
-        on_upload=lambda e: _klik_upload(container, ronde.id, e),
-    ).props('accept=".xlsx,.xls" flat dense bordered').classes("max-w-xs")
+    bestand_upload(
+        "Antwoorden .xlsx", ".xlsx,.xls", lambda e: _klik_upload(container, ronde.id, e),
+    )
 
 
 async def _klik_upload(container: ui.column, ronde_id: str, e: events.UploadEventArguments) -> None:
@@ -199,7 +186,7 @@ async def _klik_upload(container: ui.column, ronde_id: str, e: events.UploadEven
             ui.label("Niet-gekoppelde kolommen").classes("text-subtitle1")
             for k in resultaat.niet_gekoppelde_kolommen:
                 ui.label(f"- {k}").classes("text-caption")
-            ui.button("Ok", on_click=info_dialoog.close).props("flat")
+            ui.button("Ok", on_click=info_dialoog.close).props("flat no-caps")
         info_dialoog.open()
 
     keuzes: dict[str, str | None] = {}
@@ -236,13 +223,13 @@ async def _toon_naamresolutie(resultaat: ImportResultaat) -> dict[str, str | Non
                 opties, label=probleem.ruwe_naam, value=""
             ).classes("full-width")
         with ui.row().classes("q-mt-sm justify-end full-width"):
-            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat no-caps")
             ui.button(
                 "Doorgaan",
                 on_click=lambda: dialoog.submit(
                     {naam: (select.value or None) for naam, select in selects.items()}
                 ),
-            ).props("color=primary")
+            ).props("color=primary no-caps")
 
     return await dialoog
 

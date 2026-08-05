@@ -14,7 +14,7 @@ from nicegui import ui
 
 from ..domain.analysis import Bevinding
 from ..domain.beschikbaarheid import verzamel_beschikbaarheid
-from ..domain.formatting import format_datum, format_datum_lang, format_tijd, format_tijdvak
+from ..domain.formatting import format_datum, format_tijd, format_tijdvak
 from ..model.entities import Les, les_seizoen_id
 from ..model.project import Project
 from ..model.scope import Scope
@@ -23,6 +23,7 @@ from . import lesbewerkingen as lb
 from .dialogen.diff_dialoog import DiffRegel, toon_diff_dialoog
 from .dialogen.scope_balk import create_scope_balk
 from .state import state
+from .velden import tijd_veld
 
 _WEEK_GRENS_STIJL = "border-top: 2px solid #7a9cc4;"
 _GEEN_WEEK_GRENS_STIJL = "border-top: 1px solid transparent;"
@@ -127,9 +128,9 @@ class LessonRow:
         while len(self.slot_knoppen) < aantal_slots:
             i = len(self.slot_knoppen)
             with self.slots_container:
-                knop = ui.button().props("flat dense no-caps size=sm").style(
-                    "width: 130px; justify-content: flex-start;"
-                )
+                knop = ui.button().props("flat dense no-caps size=sm").classes(
+                    "les-slot-knop"
+                ).style("width: 130px; justify-content: flex-start;")
                 with knop:
                     menu = ui.menu()
                 self.slot_knoppen.append(knop)
@@ -250,10 +251,12 @@ class LessonRow:
             ui.label("Les laten vervallen").classes("text-subtitle1")
             reden_veld = ui.input("Reden (bv. 'Beka', 'Lustrum Trip')").classes("full-width")
             with ui.row().classes("q-mt-sm justify-end full-width"):
-                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props(
+                    "flat no-caps"
+                )
                 ui.button(
                     "Vervalt", on_click=lambda: dialoog.submit(reden_veld.value)
-                ).props("color=negative")
+                ).props("color=negative no-caps")
 
         reden = await dialoog
         if reden is None:
@@ -265,14 +268,16 @@ class LessonRow:
         with ui.dialog() as dialoog, ui.card():
             ui.label("Tijd aanpassen").classes("text-subtitle1")
             with ui.row():
-                begin_veld = ui.input("Begintijd (HH:MM)", value=format_tijd(les.begin_tijd))
-                eind_veld = ui.input("Eindtijd (HH:MM)", value=format_tijd(les.eind_tijd))
+                begin_veld = tijd_veld("Begintijd", format_tijd(les.begin_tijd))
+                eind_veld = tijd_veld("Eindtijd", format_tijd(les.eind_tijd))
             with ui.row().classes("q-mt-sm justify-end full-width"):
-                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props(
+                    "flat no-caps"
+                )
                 ui.button(
                     "Opslaan",
                     on_click=lambda: dialoog.submit((begin_veld.value, eind_veld.value)),
-                ).props("color=primary")
+                ).props("color=primary no-caps")
 
         resultaat = await dialoog
         if resultaat is None:
@@ -294,10 +299,12 @@ class LessonRow:
             ui.label("Titel geven").classes("text-subtitle1")
             titel_veld = ui.input("Titel", value=les.titel or "").classes("full-width")
             with ui.row().classes("q-mt-sm justify-end full-width"):
-                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props(
+                    "flat no-caps"
+                )
                 ui.button(
                     "Opslaan", on_click=lambda: dialoog.submit(titel_veld.value)
-                ).props("color=primary")
+                ).props("color=primary no-caps")
 
         titel = await dialoog
         if titel is None:
@@ -333,16 +340,16 @@ class PlanningView:
         self._rows.clear()
 
         with self._container:
-            scope_balk_rij = ui.row().classes("q-gutter-sm q-mb-xs items-center")
-            create_scope_balk(scope_balk_rij)
-            with ui.row().classes("q-gutter-sm q-mb-xs items-center"):
-                ui.button(
-                    "+ Extra les toevoegen", icon="add", on_click=self._klik_extra_les_toevoegen
-                ).props("flat dense color=primary")
-                ui.button(
-                    "Automatisch invullen", icon="auto_fix_high",
-                    on_click=self._klik_automatisch_invullen,
-                ).props("dense color=primary")
+            with ui.column().classes("full-width").style(
+                "padding: 12px 16px 8px 16px; gap: 8px; border-bottom: 1px solid #e0e0e0;"
+            ):
+                scope_balk_rij = ui.row().classes("q-gutter-sm items-center full-width")
+                create_scope_balk(scope_balk_rij)
+                with ui.row().classes("q-gutter-sm items-center"):
+                    ui.button(
+                        "Automatisch invullen", icon="auto_fix_high",
+                        on_click=self._klik_automatisch_invullen,
+                    ).props("dense color=primary no-caps")
 
         if state.doc is None:
             with self._container:
@@ -441,46 +448,6 @@ class PlanningView:
             l.id for l in project.lessen if l.datum.isocalendar()[:2] == jaar_week
         ]
         self.refresh_lessen(ids_in_week)
-
-    async def _klik_extra_les_toevoegen(self) -> None:
-        if state.doc is None:
-            return
-        with ui.dialog() as dialoog, ui.card():
-            ui.label("Extra les toevoegen").classes("text-subtitle1")
-            datum_kiezer = ui.date(value=date.today().isoformat())
-            with ui.row():
-                begin_veld = ui.input("Begintijd (HH:MM)", value="10:00")
-                eind_veld = ui.input("Eindtijd (HH:MM)", value="12:00")
-            titel_veld = ui.input("Titel (bv. 'Open Les')").classes("full-width")
-            with ui.row().classes("q-mt-sm justify-end full-width"):
-                ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
-                ui.button(
-                    "Toevoegen",
-                    on_click=lambda: dialoog.submit(
-                        (datum_kiezer.value, begin_veld.value, eind_veld.value, titel_veld.value)
-                    ),
-                ).props("color=primary")
-
-        resultaat = await dialoog
-        if resultaat is None:
-            return
-        datum_str, begin_str, eind_str, titel = resultaat
-        try:
-            from ..domain.formatting import parse_nl_tijd
-
-            datum_waarde = date.fromisoformat(datum_str)
-            begin_tijd = parse_nl_tijd(begin_str)
-            eind_tijd = parse_nl_tijd(eind_str)
-        except ValueError:
-            ui.notify(
-                "Ongeldige datum of tijd. Gebruik het formaat HH:MM voor tijden.",
-                type="negative",
-            )
-            return
-        lb.voeg_extra_les_toe(datum_waarde, begin_tijd, eind_tijd, titel)
-        ui.notify(f"Extra les toegevoegd op {format_datum_lang(datum_waarde)}.", type="positive")
-        self.rebuild()
-        self._on_wijziging_header()
 
     async def _klik_automatisch_invullen(self) -> None:
         """Lost de huidige scope op met de solver en toont het resultaat als een

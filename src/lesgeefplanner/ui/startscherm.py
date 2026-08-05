@@ -1,5 +1,8 @@
-"""Eerste scherm: nieuw project, doorrollen naar een nieuw jaar, oude YAML/Excel-opzet
-importeren, een bestaand bestand openen, of een recent bestand kiezen."""
+"""Eerste scherm: een vertrouwd "welkomscherm"-patroon (VS Code/JetBrains/Office) --
+recent geopende bestanden prominent en meteen zichtbaar (dat is voor een terugkerende
+gebruiker verreweg de meest voorkomende actie), "Nieuw project"/"Bestand openen" als
+duidelijke primaire acties ernaast, en de zeldzame/eenmalige acties (jaarwissel, oude YAML
+importeren) opgevouwen achter "Meer opties" zodat ze niet met de hoofdstroom concurreren."""
 from __future__ import annotations
 
 import tempfile
@@ -18,95 +21,127 @@ from .state import state
 
 
 def create_startscherm(on_klaar: Callable[[], None]) -> None:
-    with ui.column().classes("items-center q-mt-xl full-width"):
-        ui.label("Lesgeefplanner").classes("text-h4 q-mb-md")
+    with ui.column().classes("items-center justify-center full-width").style(
+        "min-height: 100vh; padding: 32px; gap: 0;"
+    ):
+        ui.label("Lesgeefplanner").classes("text-h4 q-mb-lg")
 
-        with ui.card().classes("q-pa-md").style("width: 480px;"):
-            ui.label("Nieuw project").classes("text-subtitle1")
-            naam_veld = ui.input(
-                "Naam", value="Lesgeefplanning " + _volgend_seizoensjaar()
-            ).classes("full-width")
-            ui.button(
-                "Nieuw project aanmaken",
-                icon="add",
-                on_click=lambda: _nieuw_project(naam_veld.value, on_klaar),
-            ).props("color=primary").classes("q-mt-sm")
+        with ui.row().classes("items-start justify-center q-gutter-lg").style(
+            "max-width: 900px; width: 100%; flex-wrap: wrap;"
+        ):
+            _recent_kolom(on_klaar)
+            _acties_kolom(on_klaar)
 
-        with ui.card().classes("q-pa-md q-mt-md").style("width: 480px;"):
-            ui.label("Nieuw jaar op basis van vorig bestand").classes("text-subtitle1")
-            ui.label(
-                "Rooster en lesgevers (+1 jaar ervaring) blijven; toewijzingen en "
-                "beschikbaarheid worden leeggemaakt en de kalender schuift 52 weken op. "
-                "Gebruik daarna 'Kalender bijwerken' om de lessen te genereren."
-            ).classes("text-caption text-grey-7")
-            vorig_pad_veld = ui.input("Pad naar vorig .lesplan-bestand").classes("full-width")
-            nieuwe_naam_veld = ui.input(
-                "Naam nieuw project", value="Lesgeefplanning " + _volgend_seizoensjaar()
-            ).classes("full-width")
-            with ui.row().classes("q-mt-sm q-gutter-sm"):
-                if native_beschikbaar():
-                    ui.button(
-                        "Bladeren…", icon="folder_open",
-                        on_click=lambda: _bladeren(vorig_pad_veld),
-                    ).props("outline")
-                ui.button(
-                    "Doorrollen naar nieuw jaar", icon="fast_forward",
-                    on_click=lambda: _rol_door(vorig_pad_veld.value, nieuwe_naam_veld.value, on_klaar),
-                ).props("color=primary")
 
-        with ui.card().classes("q-pa-md q-mt-md").style("width: 480px;"):
-            ui.label("Importeer oude opzet (YAML)").classes("text-subtitle1")
-            ui.label(
-                "Voor wie nog een planning.yml heeft van vóór deze versie. Lesgevers.xlsx "
-                "en planning.xlsx zijn optioneel en vullen lesgevers/toewijzingen aan."
-            ).classes("text-caption text-grey-7")
-            tijdelijke_paden: dict[str, str] = {}
-            ui.upload(
-                label="planning.yml",
-                auto_upload=True,
-                on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "yaml", e),
-            ).props('accept=".yml,.yaml" flat dense bordered').classes("full-width q-mt-xs")
-            ui.upload(
-                label="lesgevers.xlsx (optioneel)",
-                auto_upload=True,
-                on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "lesgevers", e),
-            ).props('accept=".xlsx" flat dense bordered').classes("full-width q-mt-xs")
-            ui.upload(
-                label="planning.xlsx (optioneel)",
-                auto_upload=True,
-                on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "planning", e),
-            ).props('accept=".xlsx" flat dense bordered').classes("full-width q-mt-xs")
-            ui.button(
-                "Importeren", icon="upload_file",
-                on_click=lambda: _klik_importeer_legacy(tijdelijke_paden, on_klaar),
-            ).props("color=primary dense").classes("q-mt-sm")
-
-        with ui.card().classes("q-pa-md q-mt-md").style("width: 480px;"):
-            ui.label("Bestaand project openen").classes("text-subtitle1")
-            pad_veld = ui.input("Pad naar .lesplan-bestand").classes("full-width")
-            with ui.row().classes("q-mt-sm q-gutter-sm"):
-                if native_beschikbaar():
-                    ui.button(
-                        "Bladeren…",
-                        icon="folder_open",
-                        on_click=lambda: _bladeren(pad_veld),
-                    ).props("outline")
-                ui.button(
-                    "Openen",
-                    icon="folder_open",
-                    on_click=lambda: _open_project(pad_veld.value, on_klaar),
-                ).props("color=primary")
-
+def _recent_kolom(on_klaar: Callable[[], None]) -> None:
+    with ui.card().classes("q-pa-md").style("flex: 3 1 380px; min-width: 320px;"):
+        ui.label("Recent geopend").classes("text-subtitle1 q-mb-sm")
         recente = laad_recente_bestanden()
-        if recente:
-            with ui.card().classes("q-pa-md q-mt-md").style("width: 480px;"):
-                ui.label("Recent geopend").classes("text-subtitle1 q-mb-sm")
-                for pad_str in recente:
-                    ui.button(
-                        Path(pad_str).name,
-                        icon="history",
-                        on_click=lambda p=pad_str: _open_project(p, on_klaar),
-                    ).props("flat align=left").classes("full-width").tooltip(pad_str)
+        if not recente:
+            ui.label(
+                "Nog geen projecten geopend. Maak hiernaast een nieuw project aan, of "
+                "open een bestaand .lesplan-bestand."
+            ).classes("text-caption text-grey-6")
+        for pad_str in recente:
+            _recent_rij(pad_str, on_klaar)
+
+
+def _recent_rij(pad_str: str, on_klaar: Callable[[], None]) -> None:
+    pad = Path(pad_str)
+    with ui.row().classes("items-center cursor-pointer full-width list-item").style(
+        "padding: 10px 12px; gap: 10px;"
+    ).props("tabindex=0").on(
+        "click", lambda: _open_project(pad_str, on_klaar)
+    ).on("keydown.enter", lambda: _open_project(pad_str, on_klaar)):
+        ui.icon("description").classes("text-grey-7")
+        with ui.column().style("gap: 0; min-width: 0; flex: 1;"):
+            ui.label(pad.name).classes("text-body2").style(
+                "overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+            )
+            ui.label(str(pad.parent)).classes("text-caption text-grey-6").style(
+                "overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+            )
+
+
+def _acties_kolom(on_klaar: Callable[[], None]) -> None:
+    with ui.card().classes("q-pa-md").style("flex: 2 1 300px; min-width: 280px;"):
+        ui.label("Aan de slag").classes("text-subtitle1 q-mb-sm")
+
+        naam_veld = ui.input(
+            "Naam nieuw project", value="Lesgeefplanning " + _volgend_seizoensjaar()
+        ).classes("full-width")
+        ui.button(
+            "Nieuw project", icon="add",
+            on_click=lambda: _nieuw_project(naam_veld.value, on_klaar),
+        ).props("color=primary no-caps").classes("full-width q-mt-xs")
+
+        if native_beschikbaar():
+            ui.button(
+                "Bestand openen...", icon="folder_open",
+                on_click=lambda: _bladeren_en_open(on_klaar),
+            ).props("outline no-caps").classes("full-width q-mt-sm")
+        else:
+            pad_veld = ui.input("Pad naar .lesplan-bestand").classes("full-width q-mt-sm")
+            ui.button(
+                "Openen", icon="folder_open",
+                on_click=lambda: _open_project(pad_veld.value, on_klaar),
+            ).props("outline no-caps").classes("full-width q-mt-xs")
+
+        with ui.expansion("Meer opties", icon="more_horiz").classes("full-width q-mt-md"):
+            _jaarwissel_sectie(on_klaar)
+            ui.separator().classes("q-my-sm")
+            _legacy_import_sectie(on_klaar)
+
+
+def _jaarwissel_sectie(on_klaar: Callable[[], None]) -> None:
+    ui.label("Nieuw jaar op basis van vorig bestand").classes("text-caption text-weight-bold")
+    ui.label(
+        "Rooster en lesgevers (+1 jaar ervaring) blijven; toewijzingen en beschikbaarheid "
+        "worden leeggemaakt en de kalender schuift 52 weken op. Gebruik daarna 'Kalender "
+        "bijwerken' om de lessen te genereren."
+    ).classes("text-caption text-grey-7")
+    vorig_pad_veld = ui.input("Pad naar vorig .lesplan-bestand").classes("full-width q-mt-xs")
+    nieuwe_naam_veld = ui.input(
+        "Naam nieuw project", value="Lesgeefplanning " + _volgend_seizoensjaar()
+    ).classes("full-width")
+    with ui.row().classes("q-mt-xs q-gutter-sm"):
+        if native_beschikbaar():
+            ui.button(
+                "Bladeren...", icon="folder_open",
+                on_click=lambda: _bladeren(vorig_pad_veld),
+            ).props("outline dense no-caps")
+        ui.button(
+            "Doorrollen naar nieuw jaar", icon="fast_forward",
+            on_click=lambda: _rol_door(vorig_pad_veld.value, nieuwe_naam_veld.value, on_klaar),
+        ).props("color=primary dense no-caps")
+
+
+def _legacy_import_sectie(on_klaar: Callable[[], None]) -> None:
+    ui.label("Importeer oude opzet (YAML)").classes("text-caption text-weight-bold")
+    ui.label(
+        "Voor wie nog een planning.yml heeft van vóór deze versie. Lesgevers.xlsx en "
+        "planning.xlsx zijn optioneel en vullen lesgevers/toewijzingen aan."
+    ).classes("text-caption text-grey-7")
+    tijdelijke_paden: dict[str, str] = {}
+    ui.upload(
+        label="planning.yml",
+        auto_upload=True,
+        on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "yaml", e),
+    ).props('accept=".yml,.yaml" flat dense bordered').classes("full-width q-mt-xs")
+    ui.upload(
+        label="lesgevers.xlsx (optioneel)",
+        auto_upload=True,
+        on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "lesgevers", e),
+    ).props('accept=".xlsx" flat dense bordered').classes("full-width q-mt-xs")
+    ui.upload(
+        label="planning.xlsx (optioneel)",
+        auto_upload=True,
+        on_upload=lambda e: _sla_tijdelijk_op(tijdelijke_paden, "planning", e),
+    ).props('accept=".xlsx" flat dense bordered').classes("full-width q-mt-xs")
+    ui.button(
+        "Importeren", icon="upload_file",
+        on_click=lambda: _klik_importeer_legacy(tijdelijke_paden, on_klaar),
+    ).props("color=primary dense no-caps").classes("q-mt-sm")
 
 
 def _volgend_seizoensjaar() -> str:
@@ -130,6 +165,15 @@ async def _bladeren(pad_veld: ui.input) -> None:
     pad = await kies_bestand_openen(bestandstypes=(("Lesgeefplanning", "*.lesplan"),))
     if pad is not None:
         pad_veld.value = str(pad)
+
+
+async def _bladeren_en_open(on_klaar: Callable[[], None]) -> None:
+    """Kiezen EN openen in één stap (i.p.v. eerst bladeren, dan nog een keer 'Openen'
+    klikken) -- native bestandskeuze impliceert al dat je dat bestand wilt openen."""
+    pad = await kies_bestand_openen(bestandstypes=(("Lesgeefplanning", "*.lesplan"),))
+    if pad is None:
+        return
+    _open_project(str(pad), on_klaar)
 
 
 def _open_project(pad_str: str, on_klaar: Callable[[], None]) -> None:

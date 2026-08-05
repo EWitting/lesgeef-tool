@@ -36,10 +36,10 @@ async def toon_diff_dialoog(
         with ui.row().classes("q-mb-xs q-gutter-sm"):
             ui.button(
                 "Alles aan", on_click=lambda: _zet_alles(checkboxen, True)
-            ).props("flat dense")
+            ).props("flat dense no-caps")
             ui.button(
                 "Alles uit", on_click=lambda: _zet_alles(checkboxen, False)
-            ).props("flat dense")
+            ).props("flat dense no-caps")
 
         with ui.scroll_area().style("max-height: 400px; width: 100%;"):
             vorige_groep: object = object()
@@ -50,13 +50,15 @@ async def toon_diff_dialoog(
                 checkboxen[regel.id] = ui.checkbox(regel.omschrijving, value=regel.aangevinkt)
 
         with ui.row().classes("q-mt-sm justify-end full-width"):
-            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props(
+                "flat no-caps"
+            )
             ui.button(
                 toepassen_label,
                 on_click=lambda: dialoog.submit(
                     {rid for rid, cb in checkboxen.items() if cb.value}
                 ),
-            ).props("color=primary")
+            ).props("color=primary no-caps")
 
     return await dialoog
 

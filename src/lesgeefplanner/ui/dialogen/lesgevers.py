@@ -11,6 +11,7 @@ from nicegui import events, ui
 from ...exchange.roster_import import DoelVeld, lees_lesgevers
 from .. import lesgeverbewerkingen as lgb
 from ..state import state
+from ..velden import bestand_upload
 
 _VELD_LABEL: dict[DoelVeld, str] = {
     "naam": "Naam", "ervaring_jaren": "Ervaring (jaren)", "actief": "Actief",
@@ -32,8 +33,12 @@ def create_lesgevers_paneel(container: ui.column) -> None:
         for lg in lesgevers:
             _lesgever_rij(container, lg.id)
 
-        with ui.row().classes("q-mt-sm q-gutter-xs items-center"):
-            naam_veld = ui.input("Nieuwe lesgever").props("dense").style("width: 160px;")
+        with ui.row().classes("q-mt-sm items-center full-width").style(
+            "flex-wrap: wrap; gap: 6px;"
+        ):
+            naam_veld = ui.input("Nieuwe lesgever").props("dense").style(
+                "flex: 1 1 140px; min-width: 140px;"
+            )
             ui.button(
                 icon="add", on_click=lambda: _klik_toevoegen(container, naam_veld)
             ).props("dense color=primary")
@@ -43,11 +48,9 @@ def create_lesgevers_paneel(container: ui.column) -> None:
         ui.label(
             "Bestaande namen worden bijgewerkt (ervaring/actief); nieuwe namen toegevoegd."
         ).classes("text-caption text-grey-7")
-        ui.upload(
-            label="Lesgevers .xlsx",
-            auto_upload=True,
-            on_upload=lambda e: _klik_upload(container, e),
-        ).props('accept=".xlsx,.xls" flat dense bordered').classes("max-w-xs")
+        bestand_upload(
+            "Lesgevers .xlsx", ".xlsx,.xls", lambda e: _klik_upload(container, e),
+        )
 
 
 def _klik_toevoegen(container: ui.column, naam_veld: ui.input) -> None:
@@ -64,8 +67,10 @@ def _lesgever_rij(container: ui.column, lesgever_id: str) -> None:
     lg = _vind(lesgever_id)
     if lg is None:
         return
-    with ui.row().classes("items-center q-gutter-xs full-width no-wrap"):
-        naam_veld = ui.input(value=lg.naam).props("dense").style("width: 110px;")
+    with ui.row().classes("items-center full-width").style("flex-wrap: wrap; gap: 6px;"):
+        naam_veld = ui.input(value=lg.naam).props("dense").style(
+            "flex: 2 1 100px; min-width: 100px;"
+        )
         naam_veld.on(
             "blur",
             lambda: (
@@ -75,7 +80,7 @@ def _lesgever_rij(container: ui.column, lesgever_id: str) -> None:
         )
         ervaring_veld = ui.number(value=lg.ervaring_jaren, min=0, max=50).props(
             "dense"
-        ).style("width: 60px;").tooltip("Ervaring (jaren)")
+        ).style("flex: 1 1 60px; min-width: 60px;").tooltip("Ervaring (jaren)")
         ervaring_veld.on(
             "blur",
             lambda: (
@@ -149,7 +154,7 @@ async def _toon_kolommapping_dialoog(
                 "full-width"
             )
         with ui.row().classes("q-mt-sm justify-end full-width"):
-            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat no-caps")
 
             def _klik_doorgaan() -> None:
                 mapping = {veld: select.value for veld, select in selects.items()}
@@ -158,5 +163,5 @@ async def _toon_kolommapping_dialoog(
                     return
                 dialoog.submit(mapping)
 
-            ui.button("Doorgaan", on_click=_klik_doorgaan).props("color=primary")
+            ui.button("Doorgaan", on_click=_klik_doorgaan).props("color=primary no-caps")
     return await dialoog

@@ -1,9 +1,13 @@
 """Excel-export en het terug-importeren van wijzigingen (samenvoeging, geen overschrijving).
-Zie docs/DESIGN.md §4.3/§4.4 en docs/PLAN.md fase 7."""
+Zie docs/DESIGN.md §4.3/§4.4 en docs/PLAN.md fase 7.
+
+Export en import staan als twee losse knoppen naast elkaar in de header (niet als één
+gecombineerde dialoog) -- export is een directe actie (kies pad, klaar), import is zijn
+eigen kleine flow (bestand kiezen -> naamresolutie -> diff bevestigen). Ze samenpersen in
+één dialoog verstopte de import-knop achter de export-knop."""
 from __future__ import annotations
 
 import tempfile
-from datetime import date, time
 from pathlib import Path
 
 from nicegui import events, ui
@@ -16,6 +20,7 @@ from ...exchange.types import NaamProbleem, Wijziging
 from .. import excelbewerkingen as eb
 from ..bestandsdialoog import kies_bestand_opslaan, native_beschikbaar
 from ..state import state
+from ..velden import bestand_upload
 from .diff_dialoog import DiffRegel, toon_diff_dialoog
 
 _SOORT_LABEL = {
@@ -26,41 +31,7 @@ _SOORT_LABEL = {
 }
 
 
-def create_excel_paneel(container: ui.column) -> None:
-    container.clear()
-    if state.doc is None:
-        with container:
-            ui.label("Geen project geopend.").classes("text-grey-6")
-        return
-
-    with container:
-        ui.label("Excel (Google Drive)").classes("text-subtitle1 q-mb-xs")
-        ui.label(
-            "Exporteer de planning naar Excel om te delen via Google Drive. Wijzigingen "
-            "die daar direct in de sheet gemaakt worden, kun je hierna weer terughalen."
-        ).classes("text-caption text-grey-7 q-mb-sm")
-
-        laatste_pad = state.doc.project.werkblad.laatste_export_pad
-        if laatste_pad:
-            ui.label(f"Laatst geëxporteerd naar: {laatste_pad}").classes(
-                "text-caption text-grey-7"
-            )
-
-        ui.button(
-            "Exporteer Excel", icon="download",
-            on_click=lambda: _klik_exporteer(container),
-        ).props("color=primary dense").classes("q-mb-sm")
-
-        ui.separator().classes("q-my-sm")
-        ui.label("Wijzigingen terughalen").classes("text-caption text-weight-bold")
-        ui.upload(
-            label="Excel-bestand",
-            auto_upload=True,
-            on_upload=lambda e: _klik_upload(container, e),
-        ).props('accept=".xlsx,.xls" flat dense bordered').classes("max-w-xs")
-
-
-async def _klik_exporteer(container: ui.column) -> None:
+async def exporteer_excel() -> None:
     assert state.doc is not None
     standaardnaam = f"{state.doc.project.naam}.xlsx"
     if native_beschikbaar():
@@ -79,8 +50,22 @@ async def _klik_exporteer(container: ui.column) -> None:
     with state.doc.muteer("Excel geëxporteerd"):
         state.doc.project.werkblad.laatste_export_pad = str(pad)
     ui.notify(f"Geëxporteerd naar {pad}", type="positive")
-    create_excel_paneel(container)
     state.meld_wijziging()
+
+
+def open_import_dialoog() -> None:
+    assert state.doc is not None
+    with ui.dialog() as dialoog, ui.card().style("min-width: 380px; max-width: 460px;"):
+        ui.label("Wijzigingen terughalen uit Excel").classes("text-subtitle1 q-mb-xs")
+        ui.label(
+            "Wijzigingen die rechtstreeks in de geëxporteerde sheet zijn gemaakt (bv. "
+            "iemand die zelf zijn naam invult) worden hier samengevoegd -- je krijgt "
+            "eerst te zien wat er verandert, niets wordt zomaar overschreven."
+        ).classes("text-caption text-grey-7 q-mb-sm")
+        bestand_upload("Excel-bestand", ".xlsx,.xls", lambda e: _klik_upload(dialoog, e))
+        with ui.row().classes("justify-end full-width q-mt-md"):
+            ui.button("Sluiten", on_click=dialoog.close).props("flat no-caps")
+    dialoog.open()
 
 
 async def _vraag_pad_via_dialoog(standaardnaam: str) -> Path | None:
@@ -91,15 +76,15 @@ async def _vraag_pad_via_dialoog(standaardnaam: str) -> Path | None:
             "width: 420px;"
         )
         with ui.row().classes("q-mt-sm justify-end full-width"):
-            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat no-caps")
             ui.button(
                 "Exporteren", on_click=lambda: dialoog.submit(veld.value)
-            ).props("color=primary")
+            ).props("color=primary no-caps")
     resultaat = await dialoog
     return Path(resultaat) if resultaat else None
 
 
-async def _klik_upload(container: ui.column, e: events.UploadEventArguments) -> None:
+async def _klik_upload(dialoog: ui.dialog, e: events.UploadEventArguments) -> None:
     assert state.doc is not None
     try:
         data = await e.file.read()
@@ -120,7 +105,7 @@ async def _klik_upload(container: ui.column, e: events.UploadEventArguments) -> 
             ui.label(
                 "Deze rijen worden genegeerd. Controleer of de Code-kolom nog intact is."
             ).classes("text-caption text-grey-7 q-mt-xs")
-            ui.button("Ok", on_click=info.close).props("flat")
+            ui.button("Ok", on_click=info.close).props("flat no-caps")
         info.open()
 
     if naamproblemen:
@@ -156,7 +141,7 @@ async def _klik_upload(container: ui.column, e: events.UploadEventArguments) -> 
     toe_te_passen = [w for i, w in enumerate(wijzigingen) if str(i) in gekozen_regels]
     aantal = eb.pas_wijzigingen_toe(toe_te_passen)
     ui.notify(f"{aantal} wijzigingen toegepast.", type="positive")
-    create_excel_paneel(container)
+    dialoog.close()
     state.meld_wijziging()
 
 
@@ -179,13 +164,13 @@ async def _toon_naamresolutie(naamproblemen: list[NaamProbleem]) -> dict[str, st
                 opties, label=probleem.ruwe_naam, value=""
             ).classes("full-width")
         with ui.row().classes("q-mt-sm justify-end full-width"):
-            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat")
+            ui.button("Annuleren", on_click=lambda: dialoog.submit(None)).props("flat no-caps")
             ui.button(
                 "Doorgaan",
                 on_click=lambda: dialoog.submit(
                     {naam: (select.value or None) for naam, select in selects.items()}
                 ),
-            ).props("color=primary")
+            ).props("color=primary no-caps")
 
     return await dialoog
 

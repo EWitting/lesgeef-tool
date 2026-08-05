@@ -11,6 +11,8 @@ from ...domain.formatting import DAGEN_NL, format_datum, format_tijd, parse_nl_t
 from .. import jaarplanningbewerkingen as jpb
 from ..state import state
 from .diff_dialoog import DiffRegel, toon_diff_dialoog
+from .extra_les import toon_extra_les_dialoog
+from ..velden import datum_veld, tijd_veld
 
 _DAG_OPTIES = {i: naam.capitalize() for i, naam in enumerate(DAGEN_NL)}
 
@@ -25,23 +27,12 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
     project = state.doc.project
 
     with container:
-        with ui.row().classes("items-center justify-between full-width"):
-            ui.label("Jaarplanning").classes("text-subtitle1")
-            aantal = len(gewenste_lessen(project))
-            ui.label(f"{aantal} lessen bij huidige instellingen").classes(
-                "text-caption text-grey-7"
-            )
+        ui.label("Jaarplanning").classes("text-subtitle1")
 
-        ui.button(
-            "Kalender bijwerken", icon="sync",
-            on_click=lambda: _klik_kalender_bijwerken(container),
-        ).props("color=primary dense").classes("q-my-sm")
-        ui.label(
-            "Past niets automatisch toe -- toont eerst wat er zou veranderen."
-        ).classes("text-caption text-grey-7")
-
-        ui.separator().classes("q-my-sm")
-        ui.label("Seizoenen").classes("text-caption text-weight-bold")
+        # Volgorde volgt de gebruiker: eerst instellen (seizoenen, weekrooster), dan pas de
+        # actie die daarvan afhangt (kalender samenstellen) -- niet andersom (zie
+        # docs/BESLISSINGEN.md, "jaarplanning-volgorde").
+        ui.label("Seizoenen").classes("text-caption text-weight-bold q-mt-sm")
         for seizoen in project.seizoenen:
             _seizoen_rij(container, seizoen.id)
         _nieuw_seizoen_rij(container)
@@ -53,6 +44,27 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
         ).classes("text-caption text-grey-7")
         _weekrooster_editor(container, None, project.weekrooster)
 
+        ui.separator().classes("q-my-md")
+        ui.label("Kalender samenstellen").classes("text-caption text-weight-bold")
+        aantal = len(gewenste_lessen(project))
+        ui.label(f"{aantal} lessen bij huidige instellingen.").classes(
+            "text-caption text-grey-7"
+        )
+        with ui.row().classes("items-center q-gutter-sm q-mt-xs"):
+            ui.button(
+                "Kalender bijwerken", icon="sync",
+                on_click=lambda: _klik_kalender_bijwerken(container),
+            ).props("color=primary dense no-caps")
+            ui.button(
+                "Extra les toevoegen", icon="add",
+                on_click=_klik_extra_les,
+            ).props("flat dense color=primary no-caps")
+        ui.label(
+            "'Kalender bijwerken' past niets automatisch toe -- toont eerst wat er zou "
+            "veranderen op basis van seizoenen en weekrooster hierboven. 'Extra les "
+            "toevoegen' is voor eenmalige, losse lessen (bv. een Open Les)."
+        ).classes("text-caption text-grey-7")
+
         ui.separator().classes("q-my-sm")
         with ui.expansion("Geavanceerd: project als JSON (alleen-lezen)").classes("full-width"):
             ui.code(project.model_dump_json(indent=2), language="json").classes(
@@ -60,22 +72,30 @@ def create_jaarplanning_paneel(container: ui.column) -> None:
             ).style("max-height: 300px; overflow-y: auto;")
 
 
+async def _klik_extra_les() -> None:
+    await toon_extra_les_dialoog()
+
+
 def _seizoen_rij(container: ui.column, seizoen_id: str) -> None:
     seizoen = _vind_seizoen(seizoen_id)
     if seizoen is None:
         return
     with ui.card().classes("q-pa-sm full-width q-mb-xs"):
-        with ui.row().classes("items-center q-gutter-xs no-wrap"):
-            naam_veld = ui.input(value=seizoen.naam).props("dense").style("width: 140px;")
+        with ui.row().classes("items-center full-width").style(
+            "flex-wrap: wrap; gap: 6px;"
+        ):
+            naam_veld = ui.input(value=seizoen.naam).props("dense").style(
+                "flex: 1 1 100px; min-width: 100px;"
+            )
             naam_veld.on(
                 "blur", lambda: _wijzig(seizoen_id, container, naam=naam_veld.value)
             )
-            begin_veld = ui.input(value=seizoen.begin.isoformat(), label="Begin").props(
-                "dense"
-            ).style("width: 110px;")
-            eind_veld = ui.input(value=seizoen.eind.isoformat(), label="Eind").props(
-                "dense"
-            ).style("width: 110px;")
+            begin_veld = datum_veld("Begin", seizoen.begin.isoformat()).style(
+                "flex: 1 1 110px; min-width: 110px;"
+            )
+            eind_veld = datum_veld("Eind", seizoen.eind.isoformat()).style(
+                "flex: 1 1 110px; min-width: 110px;"
+            )
             begin_veld.on(
                 "blur",
                 lambda: _wijzig(seizoen_id, container, begin=_parse_datum_of_meld(begin_veld.value)),
@@ -100,10 +120,14 @@ def _seizoen_rij(container: ui.column, seizoen_id: str) -> None:
 
 
 def _nieuw_seizoen_rij(container: ui.column) -> None:
-    with ui.row().classes("items-center q-gutter-xs no-wrap q-mt-xs"):
-        naam_veld = ui.input("Naam nieuw seizoen").props("dense").style("width: 160px;")
-        begin_veld = ui.input("Begin (JJJJ-MM-DD)").props("dense").style("width: 130px;")
-        eind_veld = ui.input("Eind (JJJJ-MM-DD)").props("dense").style("width: 130px;")
+    with ui.row().classes("items-center full-width q-mt-xs").style(
+        "flex-wrap: wrap; gap: 6px;"
+    ):
+        naam_veld = ui.input("Naam nieuw seizoen").props("dense").style(
+            "flex: 1 1 140px; min-width: 140px;"
+        )
+        begin_veld = datum_veld("Begin").style("flex: 1 1 130px; min-width: 130px;")
+        eind_veld = datum_veld("Eind").style("flex: 1 1 130px; min-width: 130px;")
         ui.button(
             icon="add",
             on_click=lambda: _klik_nieuw_seizoen(container, naam_veld, begin_veld, eind_veld),
@@ -148,20 +172,26 @@ def _wijzig(seizoen_id: str, container: ui.column, **kwargs) -> None:
 
 def _weekrooster_editor(container: ui.column, seizoen_id: str | None, slots: list) -> None:
     for i, slot in enumerate(slots):
-        with ui.row().classes("items-center q-gutter-xs no-wrap"):
-            ui.label(_DAG_OPTIES[slot.dag]).classes("text-caption").style("width: 80px;")
+        with ui.row().classes("items-center full-width").style("flex-wrap: wrap; gap: 6px;"):
+            ui.label(_DAG_OPTIES[slot.dag]).classes("text-caption").style(
+                "flex: 1 1 70px; min-width: 70px;"
+            )
             ui.label(f"{format_tijd(slot.begin_tijd)} - {format_tijd(slot.eind_tijd)}").classes(
                 "text-caption"
-            ).style("width: 110px;")
+            ).style("flex: 2 1 100px; min-width: 100px;")
             ui.button(
                 icon="delete",
                 on_click=lambda i=i: _klik_verwijder_slot(container, seizoen_id, i),
             ).props("flat dense size=sm color=negative")
 
-    with ui.row().classes("items-center q-gutter-xs no-wrap q-mt-xs"):
-        dag_veld = ui.select(_DAG_OPTIES, value=0).props("dense").style("width: 110px;")
-        begin_veld = ui.input("Begin", value="16:00").props("dense").style("width: 70px;")
-        eind_veld = ui.input("Eind", value="19:00").props("dense").style("width: 70px;")
+    with ui.row().classes("items-center full-width q-mt-xs").style(
+        "flex-wrap: wrap; gap: 6px;"
+    ):
+        dag_veld = ui.select(_DAG_OPTIES, value=0).props("dense").style(
+            "flex: 1 1 100px; min-width: 100px;"
+        )
+        begin_veld = tijd_veld("Begin", "16:00").style("flex: 1 1 90px; min-width: 90px;")
+        eind_veld = tijd_veld("Eind", "19:00").style("flex: 1 1 90px; min-width: 90px;")
         ui.button(
             icon="add",
             on_click=lambda: _klik_voeg_slot_toe(

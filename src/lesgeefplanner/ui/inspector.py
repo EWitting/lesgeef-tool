@@ -102,7 +102,7 @@ class Inspector:
 
     def _render_gezondheid(self, project, bevindingen: list[Bevinding]) -> None:
         with ui.row().classes("items-center justify-between full-width"):
-            ui.label("Gezondheid").classes("text-h6")
+            ui.label("Status").classes("text-h6")
             ui.button(
                 icon="content_copy", on_click=lambda: self._kopieer_rapport(bevindingen)
             ).props("flat dense").tooltip("Kopieer rapport")
@@ -222,7 +222,7 @@ class Inspector:
     # ------------------------------------------------------------------
 
     def _render_les(self, project, les, bevindingen: list[Bevinding]) -> None:
-        ui.button("← Gezondheid", on_click=self.toon_gezondheid).props("flat dense")
+        ui.button("← Status", on_click=self.toon_gezondheid).props("flat dense no-caps")
 
         ui.label(format_datum_lang(les.datum)).classes("text-h6")
         ui.label(format_tijdvak(les.begin_tijd, les.eind_tijd)).classes(
@@ -275,7 +275,7 @@ class Inspector:
     # ------------------------------------------------------------------
 
     def _render_lesgever(self, project, lesgever) -> None:
-        ui.button("← Gezondheid", on_click=self.toon_gezondheid).props("flat dense")
+        ui.button("← Status", on_click=self.toon_gezondheid).props("flat dense no-caps")
 
         ui.label(lesgever.naam).classes("text-h6")
         ui.label(f"Ervaring: {lesgever.ervaring_jaren} jaar").classes("text-caption text-grey-7")

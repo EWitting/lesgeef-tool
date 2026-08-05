@@ -43,8 +43,8 @@ def _toon_en_log_fout(exception: Exception) -> None:
         with ui.row().classes("q-mt-sm justify-end full-width"):
             ui.button(
                 "Kopieer technische details", on_click=lambda: _kopieer(details)
-            ).props("flat")
-            ui.button("Sluiten", on_click=dialoog.close).props("color=primary")
+            ).props("flat no-caps")
+            ui.button("Sluiten", on_click=dialoog.close).props("color=primary no-caps")
     dialoog.open()
 
 
