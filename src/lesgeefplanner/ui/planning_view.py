@@ -82,14 +82,16 @@ class LessonRow:
                         self.stip_tooltip = ui.tooltip("")
                     self.datum_label = ui.label().classes("text-caption").style("width: 110px;")
                     self.tijd_label = ui.label().classes("text-caption").style("width: 95px;")
-                    self.titel_label = ui.label().classes("text-caption").style(
-                        "width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-                    )
                 self.slots_container = ui.row().classes("items-center").style(
                     "flex-wrap: nowrap; gap: 4px;"
                 )
                 self.slot_knoppen: list[ui.button] = []
                 self.slot_menus: list[ui.menu] = []
+                # Na de instructeur-slots i.p.v. ervoor, zodat een status als "Vervalt" niet
+                # de aandacht wegkaapt van wie er les geeft (docs/DESIGN.md §4.7).
+                self.titel_label = ui.label().classes("text-caption cursor-pointer").style(
+                    "width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                ).on("click", lambda: self._on_selecteer(self._les_id))
 
                 # margin-left: auto duwt de acties-knop altijd naar de rechterrand van de
                 # (nu full-width) rij, ongeacht hoeveel slot-knoppen ervoor staan -- zo
@@ -535,6 +537,13 @@ class PlanningView:
             return
 
         lb.pas_solverresultaat_toe(gekozen, result.toewijzingen)
-        self.rebuild()
-        self._on_wijziging_header()
-        ui.notify(f"{len(gekozen)} lessen bijgewerkt.", type="positive")
+        try:
+            # De pagina kan intussen gesloten/herladen zijn (bv. tijdens het lange
+            # wachten op de solver of de bevestigingsdialoog hierboven) -- de
+            # toewijzingen zijn dan al netjes toegepast, maar er is geen scherm meer
+            # om bij te werken.
+            self.rebuild()
+            self._on_wijziging_header()
+            ui.notify(f"{len(gekozen)} lessen bijgewerkt.", type="positive")
+        except RuntimeError:
+            pass
