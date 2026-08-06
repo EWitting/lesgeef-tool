@@ -19,3 +19,17 @@ def verzamel_beschikbaarheid(project: Project) -> dict[tuple[str, str], Antwoord
             for les_id, waarde in antwoord.waarden.items():
                 resultaat[(antwoord.lesgever_id, les_id)] = waarde
     return resultaat
+
+
+def niet_meedoende_lesgevers(project: Project, les_ids: set[str]) -> set[str]:
+    """lesgever_ids die in de nieuwste ronde die minstens één van `les_ids` raakt expliciet
+    'nee' antwoordden op de screeningvraag (doet_mee=False) -- bewust niet beschikbaar voor
+    die periode, in tegenstelling tot 'nog niet gereageerd' (dat blijft gewoon 'onbekend',
+    zie verzamel_beschikbaarheid hierboven en analysis.py:_analyseer_reacties)."""
+    laatste: dict[str, bool] = {}
+    for ronde in sorted(project.rondes, key=lambda r: r.aangemaakt_op):
+        if not {vraag.les_id for vraag in ronde.vragen} & les_ids:
+            continue
+        for antwoord in ronde.antwoorden:
+            laatste[antwoord.lesgever_id] = antwoord.doet_mee
+    return {lesgever_id for lesgever_id, doet_mee in laatste.items() if not doet_mee}

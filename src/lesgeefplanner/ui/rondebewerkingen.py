@@ -8,6 +8,7 @@ from datetime import date, datetime
 from ..domain.formatting import format_datum_lang, format_tijdvak
 from ..exchange.types import ImportResultaat
 from ..model.availability import Antwoord, Ronde, RondeVraag
+from ..model.project import Project
 from ..model.scope import Scope
 from .state import state
 
@@ -60,6 +61,10 @@ def verwerk_importresultaat(
             lesgever_id=ga.lesgever_id, waarden=ga.waarden, ingevuld_op=ga.ingevuld_op,
             doet_mee=ga.doet_mee,
         )
+    # (lesgever_id, ruwe_naam) van elke handmatig opgeloste naam -- na de mutatie hieronder
+    # als alias op de lesgever onthouden (_leer_alias), zodat dezelfde afwijkende spelling
+    # bij een volgende herupload niet opnieuw een keuze vraagt.
+    opgeloste_namen: list[tuple[str, str]] = []
     for probleem in resultaat.naamproblemen:
         gekozen_id = keuzes_naamproblemen.get(probleem.ruwe_naam)
         if gekozen_id is None:
@@ -68,6 +73,7 @@ def verwerk_importresultaat(
             lesgever_id=gekozen_id, waarden=probleem.waarden, ingevuld_op=probleem.ingevuld_op,
             doet_mee=probleem.doet_mee,
         )
+        opgeloste_namen.append((gekozen_id, probleem.ruwe_naam))
 
     if not nieuwe_antwoorden:
         return 0
@@ -80,5 +86,16 @@ def verwerk_importresultaat(
             a for a in actuele_ronde.antwoorden if a.lesgever_id not in nieuwe_antwoorden
         ]
         actuele_ronde.antwoorden = overige + list(nieuwe_antwoorden.values())
+        for lesgever_id, ruwe_naam in opgeloste_namen:
+            _leer_alias(state.doc.project, lesgever_id, ruwe_naam)
 
     return len(nieuwe_antwoorden)
+
+
+def _leer_alias(project: Project, lesgever_id: str, ruwe_naam: str) -> None:
+    """Onthoudt een handmatig gekozen naamkoppeling op de lesgever zelf (zie
+    exchange/forms_import.py, dat `Lesgever.aliassen` als extra exacte-match gebruikt)."""
+    lesgever = next((lg for lg in project.lesgevers if lg.id == lesgever_id), None)
+    if lesgever is None or ruwe_naam == lesgever.naam or ruwe_naam in lesgever.aliassen:
+        return
+    lesgever.aliassen = lesgever.aliassen + [ruwe_naam]

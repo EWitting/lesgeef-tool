@@ -13,7 +13,7 @@ import json
 from nicegui import ui
 
 from ..domain.analysis import Bevinding, analyseer
-from ..domain.beschikbaarheid import verzamel_beschikbaarheid
+from ..domain.beschikbaarheid import niet_meedoende_lesgevers, verzamel_beschikbaarheid
 from ..domain.formatting import format_datum_lang, format_tijdvak
 from ..domain.report import genereer_tekstrapport
 from ..domain.werkverdeling import doel_voor_seizoen, lessen_per_seizoen, totaal_voor_lesgever
@@ -156,6 +156,7 @@ class Inspector:
         ]
         seizoenen_in_scope = {les_seizoen_id(l) for l in lessen_in_scope}
         per_seizoen = lessen_per_seizoen(project)
+        niet_beschikbaar = niet_meedoende_lesgevers(project, {l.id for l in lessen_in_scope})
 
         gegevens: list[tuple[str, str, int, int]] = []
         for lg in project.lesgevers:
@@ -179,7 +180,8 @@ class Inspector:
 
         ui.label(
             "Balk = toegewezen lessen, zwarte streep = evenredig verdeeld doel. "
-            "Rood = boven doel, blauw = onder doel, groen = op doel."
+            "Rood = boven doel, blauw = onder doel, groen = op doel. Grijs/vervaagd = "
+            "antwoordde 'nee' op de screeningvraag voor deze periode."
         ).classes("text-caption text-grey-6 q-mb-xs")
 
         max_waarde = max((max(t, d) for _, _, t, d in gegevens), default=1) or 1
@@ -189,10 +191,12 @@ class Inspector:
             # voor de intrinsieke breedte), waardoor "flex: 1" niets heeft om in te groeien
             # -- de balk werd dan onzichtbaar/nul breed en elke doel-streep viel op
             # dezelfde plek, ongeacht ieders werkelijke doel.
+            afwezig = lg_id in niet_beschikbaar
             with ui.row().classes("items-center cursor-pointer full-width").style(
-                "gap: 6px;"
+                "gap: 6px;" + (" opacity: 0.4;" if afwezig else "")
             ).on("click", lambda lg_id=lg_id: self.toon_lesgever(lg_id)):
-                ui.label(naam).classes("text-caption").style(
+                naam_tekst = f"{naam} (niet besch.)" if afwezig else naam
+                ui.label(naam_tekst).classes("text-caption").style(
                     "width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
                 )
                 with ui.element("div").style(

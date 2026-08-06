@@ -60,7 +60,13 @@ def lees_forms_export(pad: str | Path, ronde: Ronde, project: Project) -> Import
         )
 
     lesgevers = project.lesgevers
+    # Eigen naam heeft voorrang boven een alias (setdefault) -- een eerder handmatig
+    # opgeloste afwijkende spelling (Lesgever.aliassen) telt hierna ook als exacte match,
+    # zodat eenzelfde ronde niet elke herupload opnieuw dezelfde naamresolutie vraagt.
     naam_naar_lesgever = {lg.naam: lg for lg in lesgevers}
+    for lg in lesgevers:
+        for alias in lg.aliassen:
+            naam_naar_lesgever.setdefault(alias, lg)
 
     antwoorden_per_lesgever: dict[str, GekoppeldAntwoord] = {}
     naamproblemen: list[NaamProbleem] = []

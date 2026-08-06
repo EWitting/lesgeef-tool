@@ -92,6 +92,44 @@ def test_verwerk_importresultaat_opgeloste_naamproblemen(state):
     assert ronde.antwoorden[0].waarden == {les_ids[0]: "misschien"}
 
 
+def test_verwerk_importresultaat_leert_alias_van_opgelost_naamprobleem(state):
+    """Een handmatig opgeloste naam moet als alias op de lesgever blijven staan, zodat een
+    volgende herupload met dezelfde afwijkende spelling niet opnieuw de wizard toont."""
+    les_ids = _voeg_lessen_toe(state, 1)
+    ronde_id = rb.maak_ronde("R", Scope(alleen_toekomst=False), date(2026, 1, 1))
+    lg = Lesgever(naam="Anne")
+    with state.doc.muteer("setup"):
+        state.doc.project.lesgevers.append(lg)
+
+    resultaat = ImportResultaat(
+        ronde_id=ronde_id,
+        naamproblemen=[
+            NaamProbleem(ruwe_naam="Anne T.", voorstellen=[(lg.id, 0.8)], waarden={les_ids[0]: "ja"})
+        ],
+    )
+    rb.verwerk_importresultaat(resultaat, {"Anne T.": lg.id})
+
+    lesgever = next(l for l in state.doc.project.lesgevers if l.id == lg.id)
+    assert lesgever.aliassen == ["Anne T."]
+
+
+def test_verwerk_importresultaat_overgeslagen_naamprobleem_leert_geen_alias(state):
+    les_ids = _voeg_lessen_toe(state, 1)
+    ronde_id = rb.maak_ronde("R", Scope(alleen_toekomst=False), date(2026, 1, 1))
+    lg = Lesgever(naam="Anne")
+    with state.doc.muteer("setup"):
+        state.doc.project.lesgevers.append(lg)
+
+    resultaat = ImportResultaat(
+        ronde_id=ronde_id,
+        naamproblemen=[NaamProbleem(ruwe_naam="Iemand Anders", waarden={les_ids[0]: "ja"})],
+    )
+    rb.verwerk_importresultaat(resultaat, {"Iemand Anders": None})
+
+    lesgever = next(l for l in state.doc.project.lesgevers if l.id == lg.id)
+    assert lesgever.aliassen == []
+
+
 def test_verwerk_importresultaat_overgeslagen_naamprobleem_telt_niet_mee(state):
     les_ids = _voeg_lessen_toe(state, 1)
     ronde_id = rb.maak_ronde("R", Scope(alleen_toekomst=False), date(2026, 1, 1))

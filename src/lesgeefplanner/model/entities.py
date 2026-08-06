@@ -21,6 +21,10 @@ class Lesgever(BaseModel):
     actief: bool = True
     email: str | None = None
     notitie: str = ""
+    # Ruwe namen uit een geïmporteerd bestand die een mens al eens handmatig aan deze
+    # lesgever heeft gekoppeld (zie exchange/forms_import.py) -- zodat een volgende import
+    # met dezelfde afwijkende spelling niet opnieuw diezelfde keuze hoeft te vragen.
+    aliassen: list[str] = []
 
 
 class WeekSlot(BaseModel):

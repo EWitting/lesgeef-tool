@@ -184,6 +184,25 @@ def test_screening_nee_zet_doet_mee_false(tmp_path: Path):
     assert resultaat.gekoppelde_antwoorden[0].doet_mee is False
 
 
+def test_bekende_alias_geeft_geen_naamprobleem(tmp_path: Path):
+    """Een eerder handmatig opgeloste afwijkende spelling (Lesgever.aliassen, zie
+    ui/rondebewerkingen.py:_leer_alias) moet bij een volgende import net als de echte naam
+    meteen koppelen -- geen wizard nodig."""
+    project, les1, les2 = _project_met_lessen()
+    ronde = _ronde_met_vragen(les1, les2)
+    project.lesgevers[0].aliassen = ["Anne T."]
+    anne_id = project.lesgevers[0].id
+
+    kolommen = ["Tijdstempel", "Wie ben je?", "Doe je mee?", "Les 1", "Les 2"]
+    rijen = [[datetime(2026, 1, 1, 10, 0), "Anne T.", "Ja", "Ja", "Ja"]]
+    pad = tmp_path / "export.xlsx"
+    _schrijf_xlsx(pad, kolommen, rijen)
+
+    resultaat = lees_forms_export(pad, ronde, project)
+    assert resultaat.naamproblemen == []
+    assert resultaat.gekoppelde_antwoorden[0].lesgever_id == anne_id
+
+
 def test_te_weinig_kolommen_geeft_waarschuwing(tmp_path: Path):
     """Volgorde-koppeling gaat ervan uit dat het aantal kolommen klopt -- als dat niet zo
     is (bv. een les is later toegevoegd/verwijderd), moet dat gemeld worden i.p.v.
