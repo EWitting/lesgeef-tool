@@ -27,11 +27,11 @@ def create_rondes_paneel(container: ui.column) -> None:
         return
 
     with container:
-        ui.label("Beschikbaarheidsrondes").classes("text-subtitle1 q-mb-xs")
+        ui.label("Datumprikkers").classes("text-subtitle1 q-mb-xs")
 
         project = state.doc.project
         if not project.rondes:
-            ui.label("Nog geen rondes aangemaakt.").classes("text-caption text-grey-6")
+            ui.label("Nog geen datumprikkers aangemaakt.").classes("text-caption text-grey-6")
         for ronde in sorted(project.rondes, key=lambda r: r.aangemaakt_op, reverse=True):
             _ronde_kaart(container, ronde.id)
 
@@ -41,7 +41,7 @@ def create_rondes_paneel(container: ui.column) -> None:
 
 def _nieuwe_ronde_sectie(container: ui.column) -> None:
     with ui.card().classes("q-pa-sm full-width"):
-        ui.label("Nieuwe ronde").classes("text-caption text-weight-bold")
+        ui.label("Nieuwe datumprikker").classes("text-caption text-weight-bold")
         naam_veld = ui.input("Naam (bv. 'Voorseizoen 1')").classes("full-width")
         ui.label("Voor welke lessen?").classes("text-caption text-grey-7 q-mt-xs")
         # Dezelfde scope-widget als boven de planning (middenpaneel) en dus ook dezelfde
@@ -52,7 +52,7 @@ def _nieuwe_ronde_sectie(container: ui.column) -> None:
         )
         create_scope_balk(scope_rij)
         ui.button(
-            "Ronde aanmaken",
+            "Datumprikker aanmaken",
             on_click=lambda: _klik_ronde_aanmaken(container, naam_veld),
         ).props("color=primary dense no-caps q-mt-xs")
 
@@ -60,18 +60,18 @@ def _nieuwe_ronde_sectie(container: ui.column) -> None:
 def _klik_ronde_aanmaken(container: ui.column, naam_veld: ui.input) -> None:
     naam = naam_veld.value.strip() if naam_veld.value else ""
     if not naam:
-        ui.notify("Geef de ronde een naam.", type="warning")
+        ui.notify("Geef de datumprikker een naam.", type="warning")
         return
     ronde_id = rb.maak_ronde(naam, state.scope, state.peildatum())
     ronde = _vind_ronde(ronde_id)
     if ronde is not None and not ronde.vragen:
         ui.notify(
-            "Deze ronde heeft geen enkele les geraakt -- controleer 'Voor welke lessen?' "
-            "hierboven.",
+            "Deze datumprikker heeft geen enkele les geraakt -- controleer 'Voor welke "
+            "lessen?' hierboven.",
             type="warning",
         )
     else:
-        ui.notify(f"Ronde '{naam}' aangemaakt ({len(ronde.vragen)} lessen).", type="positive")
+        ui.notify(f"Datumprikker '{naam}' aangemaakt ({len(ronde.vragen)} lessen).", type="positive")
     create_rondes_paneel(container)
     state.meld_wijziging()
 

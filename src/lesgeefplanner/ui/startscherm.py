@@ -96,7 +96,7 @@ def _acties_kolom(on_klaar: Callable[[], None]) -> None:
 def _jaarwissel_sectie(on_klaar: Callable[[], None]) -> None:
     ui.label("Nieuw jaar op basis van vorig bestand").classes("text-caption text-weight-bold")
     ui.label(
-        "Rooster en lesgevers (+1 jaar ervaring) blijven; toewijzingen en beschikbaarheid "
+        "Rooster en lesgevers (+1 jaar ervaring) blijven; indelingen en beschikbaarheid "
         "worden leeggemaakt en de kalender schuift 52 weken op. Gebruik daarna 'Kalender "
         "bijwerken' om de lessen te genereren."
     ).classes("text-caption text-grey-7")
@@ -120,7 +120,7 @@ def _legacy_import_sectie(on_klaar: Callable[[], None]) -> None:
     ui.label("Importeer oude opzet (YAML)").classes("text-caption text-weight-bold")
     ui.label(
         "Voor wie nog een planning.yml heeft van vóór deze versie. Lesgevers.xlsx en "
-        "planning.xlsx zijn optioneel en vullen lesgevers/toewijzingen aan."
+        "planning.xlsx zijn optioneel en vullen lesgevers/indelingen aan."
     ).classes("text-caption text-grey-7")
     tijdelijke_paden: dict[str, str] = {}
     ui.upload(

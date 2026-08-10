@@ -42,7 +42,7 @@ def wijs_lesgever_toe(les_id: str, slot_index: int, lesgever_id: str) -> bool:
     if any(tw.lesgever_id == lesgever_id for tw in les.toewijzingen):
         return False
 
-    with state.doc.muteer("Lesgever toegewezen"):
+    with state.doc.muteer("Lesgever ingedeeld"):
         les = vind_les(state.doc.project, les_id)
         assert les is not None
         nieuw = Toewijzing(lesgever_id=lesgever_id, vast=True, bron="handmatig")
@@ -56,7 +56,7 @@ def wijs_lesgever_toe(les_id: str, slot_index: int, lesgever_id: str) -> bool:
 
 def wis_toewijzing(les_id: str, slot_index: int) -> None:
     assert state.doc is not None
-    with state.doc.muteer("Toewijzing gewist"):
+    with state.doc.muteer("Indeling gewist"):
         les = vind_les(state.doc.project, les_id)
         if les is None or slot_index >= len(les.toewijzingen):
             return
@@ -66,7 +66,7 @@ def wis_toewijzing(les_id: str, slot_index: int) -> None:
 
 def wissel_vast(les_id: str, slot_index: int) -> None:
     assert state.doc is not None
-    with state.doc.muteer("Vastzetten aangepast"):
+    with state.doc.muteer("Pinnen aangepast"):
         les = vind_les(state.doc.project, les_id)
         if les is None or slot_index >= len(les.toewijzingen):
             return
@@ -147,6 +147,27 @@ def voeg_extra_les_toe(datum: date, begin_tijd: time, eind_tijd: time, titel: st
     with state.doc.muteer("Extra les toegevoegd"):
         state.doc.project.lessen.append(nieuwe_les)
     return nieuwe_les.id
+
+
+def wis_rooster_in_scope(les_ids: set[str]) -> int:
+    """Verwijdert alle niet-vaste toewijzingen van de gegeven lessen in één mutatie. Vaste
+    toewijzingen blijven staan -- die zijn een bewuste keuze van de gebruiker, geen
+    onderdeel van "met een leeg rooster beginnen". Geeft het aantal gewiste toewijzingen
+    terug voor de meldingstekst."""
+    assert state.doc is not None
+    aantal = 0
+    with state.doc.muteer("Rooster gewist"):
+        project = state.doc.project
+        for les_id in les_ids:
+            les = vind_les(project, les_id)
+            if les is None:
+                continue
+            behouden = [tw for tw in les.toewijzingen if tw.vast]
+            aantal += len(les.toewijzingen) - len(behouden)
+            if len(behouden) != len(les.toewijzingen):
+                les.toewijzingen = behouden
+                les.beschermd = True
+    return aantal
 
 
 def pas_solverresultaat_toe(les_ids: set[str], toewijzingen: dict[str, list[str]]) -> None:

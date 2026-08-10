@@ -22,7 +22,7 @@ _VELDEN: list[tuple[str, str, str]] = [
     ("richtlijn_lessen_per_week", "Richtlijn lessen per week (per lesgever)", "Werkverdeling"),
     ("penalty_boven_richtlijn", "Penalty: boven de richtlijn (per stap)", "Werkverdeling"),
     ("penalty_onder_richtlijn", "Penalty: onder de richtlijn (per stap)", "Werkverdeling"),
-    ("penalty_wijziging", "Penalty: bestaande toewijzing loslaten", "Stabiliteit"),
+    ("penalty_wijziging", "Penalty: bestaande indeling loslaten", "Stabiliteit"),
     ("max_rekentijd_seconden", "Maximale rekentijd (seconden)", "Overig"),
 ]
 
@@ -53,21 +53,39 @@ def _open_dialoog() -> None:
 
         with ui.scroll_area().style("max-height: 50vh;").classes("full-width"):
             huidige_groep: str | None = None
+            stappen_veld: ui.input | None = None
             for veldnaam, label, groep in _VELDEN:
                 if groep != huidige_groep:
                     ui.label(groep).classes("text-caption text-weight-bold q-mt-sm")
+                    if groep == "Werkverdeling":
+                        ui.label(
+                            "Richtlijn = streefaantal lessen per week per lesgever. Boven "
+                            "en onder die richtlijn geldt een oplopende penalty: de eerste "
+                            "les te veel (of te weinig) kost de penalty hieronder keer de "
+                            "eerste stapgrootte, de tweede te veel/weinig keer de tweede "
+                            "stapgrootte, enzovoort -- zo weegt verder van de richtlijn "
+                            "afraken steeds zwaarder."
+                        ).classes("text-caption text-grey-7")
+                    if groep == "Stabiliteit":
+                        ui.label(
+                            "Geldt alleen voor het van een bezette plek halen of vervangen "
+                            "van een bestaande, niet-gepinde indeling -- een lege plek "
+                            "vullen kost nooit iets. Alleen van invloed als 'Wijzigingen "
+                            "minimaliseren' bij 'Automatisch invullen' aan staat -- staat "
+                            "die uit, dan telt deze penalty niet mee."
+                        ).classes("text-caption text-grey-7")
                     huidige_groep = groep
                 waarde = getattr(cfg, veldnaam)
                 stap = 1 if isinstance(waarde, int) else 0.5
                 velden[veldnaam] = ui.number(
                     label, value=waarde, step=stap, min=0
                 ).props("dense outlined").classes("full-width")
-
-            ui.label("Werkverdeling").classes("text-caption text-weight-bold q-mt-sm")
-            stappen_veld = ui.input(
-                "Stapgroottes boven/onder richtlijn (komma-gescheiden)",
-                value=", ".join(str(s) for s in cfg.penalty_verdeling_stappen),
-            ).props("dense outlined").classes("full-width")
+                if veldnaam == "penalty_onder_richtlijn":
+                    stappen_veld = ui.input(
+                        "Stapgroottes boven/onder richtlijn (komma-gescheiden)",
+                        value=", ".join(str(s) for s in cfg.penalty_verdeling_stappen),
+                    ).props("dense outlined").classes("full-width")
+            assert stappen_veld is not None
 
         with ui.row().classes("q-mt-md justify-between full-width"):
             ui.button(

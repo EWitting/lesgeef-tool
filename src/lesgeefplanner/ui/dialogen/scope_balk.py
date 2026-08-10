@@ -27,8 +27,8 @@ def create_scope_balk(container: ui.row) -> None:
 
     with container:
         ui.icon("filter_alt").classes("text-grey-7").tooltip(
-            "Scope: bepaalt wat 'Automatisch invullen', een nieuwe beschikbaarheidsronde, "
-            "en het statuspaneel raken. Lessen buiten de scope krijgen geen gekleurde "
+            "Selectie: bepaalt wat 'Automatisch invullen', een nieuwe datumprikker, "
+            "en het statuspaneel raken. Lessen buiten de selectie krijgen geen gekleurde "
             "rand in de kalender."
         )
         seizoen_opties = {s.id: s.naam for s in project.seizoenen}

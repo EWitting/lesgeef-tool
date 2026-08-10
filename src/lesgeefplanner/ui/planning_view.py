@@ -7,6 +7,7 @@ aan na een gewone celwijziging (alleen bij het wisselen van project of scope).""
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import date
 from typing import Callable
 
@@ -216,7 +217,7 @@ class LessonRow:
                 ui.separator()
                 tw = les.toewijzingen[i]
                 ui.menu_item(
-                    f"{_PIN} Losmaken" if tw.vast else f"{_PIN} Vastzetten",
+                    f"{_PIN} Losmaken" if tw.vast else f"{_PIN} Pinnen",
                     on_click=lambda: self._klik_vast(i),
                 )
                 ui.menu_item("✕ Wissen", on_click=lambda: self._klik_wissen(i))
@@ -346,6 +347,12 @@ class PlanningView:
         # Wordt aangeroepen als de gebruiker op het datum/tijd-gebied van een rij klikt --
         # het inspectiepaneel (fase 5) toont dan de details van die les.
         self._on_selecteer_les = on_selecteer_les or (lambda les_id: None)
+        # Transient, niet opgeslagen in het project: geldt alleen voor de eerstvolgende
+        # "Automatisch invullen"-klik. Aan (standaard) = huidig gedrag, de solver laat
+        # bestaande toewijzingen zo veel mogelijk staan (penalty_wijziging telt mee). Uit =
+        # het huidige rooster telt niet mee, alsof de scope leeg is -- handig tijdens het
+        # opbouwen van een rooster waar niets van het bestaande de moeite van bewaren waard is.
+        self._minimaliseer_wijzigingen = True
 
     def rebuild(self) -> None:
         self._container.clear()
@@ -362,6 +369,23 @@ class PlanningView:
                         "Automatisch invullen", icon="auto_fix_high",
                         on_click=self._klik_automatisch_invullen,
                     ).props("dense color=primary no-caps")
+                    ui.button(
+                        "Rooster wissen", icon="delete_sweep",
+                        on_click=self._klik_rooster_wissen,
+                    ).props("dense flat no-caps").tooltip(
+                        "Verwijdert alle niet-gepinde indelingen binnen de huidige selectie "
+                        "in één keer. Gepinde indelingen (📌) blijven staan."
+                    )
+                    switch = ui.switch(
+                        "Wijzigingen minimaliseren", value=self._minimaliseer_wijzigingen,
+                        on_change=lambda e: setattr(self, "_minimaliseer_wijzigingen", e.value),
+                    ).props("dense")
+                    switch.tooltip(
+                        "Aan: kost een penalty om iemand van een bezette plek te halen of "
+                        "te vervangen -- een lege plek vullen kost nooit iets. Uit: die "
+                        "penalty vervalt, het huidige rooster telt niet mee. Gepinde "
+                        "indelingen (📌) blijven altijd staan."
+                    )
 
         if state.doc is None:
             with self._container:
@@ -467,6 +491,50 @@ class PlanningView:
         ]
         self.refresh_lessen(ids_in_week)
 
+    async def _klik_rooster_wissen(self) -> None:
+        """Wist in één keer alle niet-vaste toewijzingen binnen de huidige scope --
+        alternatief voor de "Wijzigingen minimaliseren"-schakelaar als je liever met een
+        leeg rooster begint dan de solver tegen het bestaande rooster laat opboksen.
+        Vastgezette toewijzingen (📌) blijven staan; die zijn een bewuste keuze van de
+        gebruiker (zie lesbewerkingen.py)."""
+        if state.doc is None:
+            return
+        project = state.doc.project
+        scope = state.scope
+        peildatum = state.peildatum()
+        les_ids = {
+            les.id
+            for les in project.lessen
+            if les.status == "gaat_door" and scope.bevat(les, peildatum)
+        }
+        if not les_ids:
+            ui.notify("Geen lessen in de huidige selectie om te wissen.", type="warning")
+            return
+
+        with ui.dialog() as dialoog, ui.card():
+            ui.label("Rooster wissen").classes("text-subtitle1")
+            ui.label(
+                "Alle niet-gepinde indelingen binnen de huidige selectie worden verwijderd. "
+                "Gepinde indelingen (📌) blijven staan."
+            ).classes("text-caption text-grey-7")
+            with ui.row().classes("q-mt-sm justify-end full-width"):
+                ui.button("Annuleren", on_click=lambda: dialoog.submit(False)).props(
+                    "flat no-caps"
+                )
+                ui.button(
+                    "Wissen", on_click=lambda: dialoog.submit(True)
+                ).props("color=negative no-caps")
+
+        bevestigd = await dialoog
+        if not bevestigd:
+            return
+
+        aantal = lb.wis_rooster_in_scope(les_ids)
+        state.laatste_plan_result = None
+        self.refresh_lessen(les_ids)
+        self._on_wijziging_header()
+        ui.notify(f"{aantal} indeling(en) gewist.", type="positive")
+
     async def _klik_automatisch_invullen(self) -> None:
         """Lost de huidige scope op met de solver en toont het resultaat als een
         voorstel-diff die de gebruiker per les moet bevestigen -- de solver zelf muteert
@@ -479,8 +547,16 @@ class PlanningView:
 
         request = bouw_request(project, scope, peildatum)
         if not request.lessen_in_scope:
-            ui.notify("Geen lessen in de huidige scope om automatisch in te vullen.", type="warning")
+            ui.notify("Geen lessen in de huidige selectie om automatisch in te vullen.", type="warning")
             return
+        if not self._minimaliseer_wijzigingen:
+            # "Wijzigingen minimaliseren" staat uit: het bestaande rooster mag vrij
+            # overschreven worden, dus de wijzigingskosten-penalty (Stabiliteit) telt hier
+            # niet mee. Vaste toewijzingen blijven via de harde constraint in solve.py
+            # sowieso gerespecteerd.
+            request = replace(
+                request, config=request.config.model_copy(update={"penalty_wijziging": 0})
+            )
 
         melding = ui.notification(
             "Solver bezig...", spinner=True, timeout=None, type="ongoing"

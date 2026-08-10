@@ -228,7 +228,7 @@ class Inspector:
                 "Nog niet automatisch ingevuld -- draai de solver om de score-opbouw te zien."
             ).classes("text-caption text-grey-6")
             return
-        ui.label(f"Totale score: {result.score:.1f} ({result.status})").classes(
+        ui.label(f"Totale score: {result.score:.1f}").classes(
             "text-caption q-mb-xs"
         )
         ui.label(

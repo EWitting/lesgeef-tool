@@ -37,7 +37,7 @@ class AppState:
         naar'-instelling dan een roosterwijziging. Bewuste keuze voor één mutatiepad in
         plaats van een aparte, niet-undo-bare route."""
         assert self.doc is not None
-        with self.doc.muteer("Scope aangepast"):
+        with self.doc.muteer("Selectie aangepast"):
             self.doc.project.werkblad.laatste_scope = scope
         self._meld_wijziging()
 

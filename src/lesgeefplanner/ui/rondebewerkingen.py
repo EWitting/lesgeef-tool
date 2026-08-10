@@ -35,7 +35,7 @@ def maak_ronde(naam: str, scope: Scope, peildatum: date) -> str:
         for i, les in enumerate(lessen_in_scope)
     ]
     ronde = Ronde(naam=naam, aangemaakt_op=datetime.now(), scope=scope, vragen=vragen)
-    with state.doc.muteer(f"Ronde '{naam}' aangemaakt"):
+    with state.doc.muteer(f"Datumprikker '{naam}' aangemaakt"):
         state.doc.project.rondes.append(ronde)
     return ronde.id
 
